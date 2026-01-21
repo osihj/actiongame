@@ -61,7 +61,6 @@ const COMMON_TIME_OPTIONS = generateTimeOptions(5, 30);
 
 // 自定義笑臉或狀態點
 const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, type = "smile" }) => {
-  // 使用 Tailwind 類別控制尺寸，這裡預設對應 w-6 h-6 (24px)
   const s = parseInt(size) || 20;
 
   if (!active) return <div style={{ width: `${s}px`, height: `${s}px`, borderColor: '#f3f4f6' }} className="rounded-full border-2 bg-gray-50/50" />;
@@ -71,7 +70,7 @@ const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, typ
   }
 
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" fill="none" style={{ width: `${s}px`, height: `${s}px` }} xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="10" fill={color} stroke={JAPAN_TEAL} strokeWidth="1.8"/>
       <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
       <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
@@ -84,13 +83,12 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [allUsersInfo, setAllUsersInfo] = useState([]); // 儲存基本資料
+  const [allUsersInfo, setAllUsersInfo] = useState([]); 
   const [dailyLogs, setDailyLogs] = useState({});
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState('month');
   const [rankingType, setRankingType] = useState('totalMins'); 
-  const [imgError, setImgError] = useState(false); // 處理圖片載入失敗
 
   // 打卡狀態
   const [isPracticing, setIsPracticing] = useState(false);
@@ -127,12 +125,10 @@ const App = () => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
-      setImgError(false); // 重置圖片錯誤狀態
     });
     return () => unsubscribe();
   }, []);
 
-  // 實作 Google 登入邏輯
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -149,7 +145,6 @@ const App = () => {
     }
   };
 
-  // 監聽所有使用者資訊
   useEffect(() => {
     if (!user) return;
     const publicUsersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
@@ -161,7 +156,6 @@ const App = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // 監聽當前使用者的 Logs
   useEffect(() => {
     if (!user) return;
     const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'logs');
@@ -173,7 +167,6 @@ const App = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // --- 統計計算 ---
   const startOfWeekKey = useMemo(() => {
     const now = new Date();
     const diff = now.getDate() - now.getDay();
@@ -395,12 +388,17 @@ const App = () => {
           <h1 className="text-xl font-black tracking-tight">自律動起來</h1>
         </div>
         <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl bg-[#beff64] border-2 flex items-center justify-center hover:translate-y-[-2px] transition-transform overflow-hidden" style={{ borderColor: JAPAN_TEAL, boxShadow: `3px 3px 0px 0px ${JAPAN_TEAL}` }}>
-           <img 
-             src={user?.photoURL || 'https://www.gravatar.com/avatar/?d=mp'} 
-             className="w-10 h-10 rounded-full border-2 border-[#065f46]"
-             alt="Profile"
-             onError={(e) => { e.target.onerror = null; e.target.src='https://www.gravatar.com/avatar/?d=mp'; }}
-           />
+           {user?.photoURL ? (
+             <img 
+               src={user.photoURL} 
+               className="w-full h-full object-cover" 
+               alt="Profile"
+             />
+           ) : (
+             <div className="w-full h-full flex items-center justify-center">
+               <StatusIndicator size={28} active={true} type="smile" />
+             </div>
+           )}
         </button>
       </header>
 
@@ -530,8 +528,8 @@ const App = () => {
           <div className="flex flex-col items-center animate-in fade-in duration-500 py-6 space-y-8">
              <div className="flex flex-col items-center space-y-4">
                <div className="w-24 h-24 rounded-3xl bg-[#beff64] border-2 flex items-center justify-center shadow-[8px_8px_0px_0px_rgba(6,95,70,1)] overflow-hidden" style={{ borderColor: JAPAN_TEAL }}>
-                  {user.photoURL && !imgError ? (
-                    <img src={user.photoURL} alt="User" className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
                   ) : (
                     <StatusIndicator size={56} active={true} color={BRAND_GREEN} type="smile" />
                   )}
