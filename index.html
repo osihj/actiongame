@@ -61,7 +61,7 @@ const COMMON_TIME_OPTIONS = generateTimeOptions(5, 30);
 
 // 自定義笑臉或狀態點
 const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, type = "smile" }) => {
-  // 修正：確保 size 為純數字，防止 SVG 屬性解析錯誤
+  // 確保 size 為純數字，避免傳入 "{size}" 導致 SVG 報錯
   const s = parseInt(size) || 20;
 
   if (!active) return <div style={{ width: `${s}px`, height: `${s}px`, borderColor: '#f3f4f6' }} className="rounded-full border-2 bg-gray-50/50" />;
@@ -90,7 +90,7 @@ const App = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState('month');
   const [rankingType, setRankingType] = useState('totalMins'); 
-  const [imgError, setImgError] = useState(false); // 修正：處理圖片載入失敗
+  const [imgError, setImgError] = useState(false); // 處理圖片載入失敗
 
   // 打卡狀態
   const [isPracticing, setIsPracticing] = useState(false);
@@ -627,4 +627,3 @@ const RankingFilterBtn = ({ active, onClick, label }) => (
 );
 
 export default App;
-
