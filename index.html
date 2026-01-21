@@ -3,106 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來</title>
+    <title>自律動起來 - 日系極簡運動紀錄</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 React 與相關庫 -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- 載入 Babel 且包含 data-type="module" 支援 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- 載入 Lucide 圖標 -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 載入 Confetti 動效 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
 </head>
 <body class="bg-white">
     <div id="root"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    <!-- 注意：添加 data-type="module" 以支援 import 語法 -->
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useMemo } = React;
 
+        // Firebase 導入
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { 
+            getFirestore, collection, doc, setDoc, getDoc,
+            onSnapshot, serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signOut,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInAnonymously
+        } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+
+        // --- Firebase 配置 (請在此填寫您的 API Key 等資訊) ---
         const firebaseConfig = {
-            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-            authDomain: "actiongame-7c8c9.firebaseapp.com",
-            projectId: "actiongame-7c8c9",
-            storageBucket: "actiongame-7c8c9.firebasestorage.app",
-            messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
         };
 
         const app = initializeApp(firebaseConfig);
-        window.fb = { 
-            db: getFirestore(app), auth: getAuth(app), provider: new GoogleAuthProvider(),
-            collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp, signInWithPopup, signOut 
-        };
-    </script>
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = "self-discipline-app";
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-        const JAPAN_TEAL = "#065f46";
         const BRAND_GREEN = "#beff64";
+        const JAPAN_TEAL = "#065f46";
 
-        function App() {
+        // 從全域變數獲取 Lucide 圖標組件
+        const { 
+            Calendar, User, Plus, XCircle, Smile
+        } = lucide;
+
+        const App = () => {
             const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [totalMins, setTotalMins] = useState(0);
-            const [showModal, setShowModal] = useState(false);
+            const [dailyLogs, setDailyLogs] = useState({});
+            const [showLogModal, setShowLogModal] = useState(false);
+            const [isPracticing, setIsPracticing] = useState(false);
+            const [isFiveMin, setIsFiveMin] = useState(false);
+
+            const getDateKey = (date) => {
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const day = date.getDate().toString().padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            const todayKey = getDateKey(new Date());
 
             useEffect(() => {
-                const unsub = window.fb.auth.onAuthStateChanged(u => {
-                    setUser(u);
-                    if(u) {
-                        const userDoc = window.fb.doc(window.fb.db, "users", u.uid);
-                        window.fb.onSnapshot(userDoc, d => d.exists() && setTotalMins(d.data().totalMins || 0));
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                    } else {
+                        try { await signInAnonymously(auth); } catch(e) { console.error(e); }
                     }
+                    setLoading(false);
                 });
-                return unsub;
+                return () => unsubscribe();
             }, []);
 
-            const handleLog = async () => {
-                const newMins = totalMins + 5;
-                await window.fb.setDoc(window.fb.doc(window.fb.db, "users", user.uid), { totalMins: newMins, displayName: user.displayName }, { merge: true });
-                confetti({ particleCount: 150, spread: 70 });
-                setShowModal(false);
+            useEffect(() => {
+                if (!user) return;
+                const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'logs');
+                const unsubLogs = onSnapshot(logsRef, (snap) => {
+                    const logs = {};
+                    snap.forEach(d => logs[d.id] = d.data());
+                    setDailyLogs(logs);
+                }, (err) => console.error("Firestore Error:", err));
+                return () => unsubLogs();
+            }, [user]);
+
+            const handleSave = async () => {
+                if (!user) return;
+                const logRef = doc(db, 'artifacts', appId, 'users', user.uid, 'logs', todayKey);
+                
+                await setDoc(logRef, {
+                    isPracticing, 
+                    isFiveMin,
+                    timestamp: serverTimestamp()
+                }, { merge: true });
+
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                setShowLogModal(false);
             };
 
+            if (loading) return <div className="h-screen flex items-center justify-center font-bold">載入中...</div>;
+
             return (
-                <div className="min-h-screen pb-20">
-                    <header className="p-5 border-b-2 flex justify-between items-center" style={{borderColor: JAPAN_TEAL}}>
-                        <h1 className="text-xl font-black" style={{color: JAPAN_TEAL}}>自律動起來</h1>
-                        {user ? <img src={user.photoURL} className="w-10 h-10 rounded-full border-2" style={{borderColor: JAPAN_TEAL}} /> : 
-                        <button onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)} className="text-sm font-bold border-2 px-3 py-1 rounded-lg">登入</button>}
+                <div className="min-h-screen bg-white pb-32">
+                    <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b-2" style={{ borderColor: JAPAN_TEAL }}>
+                        <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-[#beff64] rounded-lg border-2 flex items-center justify-center" style={{ borderColor: JAPAN_TEAL }}>
+                                <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: JAPAN_TEAL }}></div>
+                            </div>
+                            <h1 className="text-xl font-black" style={{ color: JAPAN_TEAL }}>自律動起來</h1>
+                        </div>
+                        <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl bg-[#beff64] border-2 overflow-hidden flex items-center justify-center" style={{ borderColor: JAPAN_TEAL }}>
+                            {user?.photoURL ? <img src={user.photoURL} /> : <User size={20} style={{ color: JAPAN_TEAL }} />}
+                        </button>
                     </header>
 
-                    <main className="p-6 max-w-md mx-auto">
-                        <div className="bg-white p-10 rounded-[2.5rem] border-4 shadow-[8px_8px_0px_0px_rgba(6,95,70,1)] text-center mb-8" style={{borderColor: JAPAN_TEAL}}>
-                            <p className="text-sm font-bold opacity-40 uppercase">本週累計</p>
-                            <div className="text-7xl font-black text-emerald-500 my-4">{totalMins} <span className="text-xl">min</span></div>
-                            <button onClick={() => setShowModal(true)} className="w-full py-5 bg-[#beff64] border-4 rounded-[2rem] font-black text-xl shadow-[6px_6px_0px_0px_rgba(6,95,70,1)]" style={{borderColor: JAPAN_TEAL, color: JAPAN_TEAL}}>+ 今日打卡</button>
-                        </div>
+                    <main className="max-w-md mx-auto p-6 space-y-6">
+                        {activeTab === 'dashboard' && (
+                            <>
+                                <div className="bg-white rounded-[1.5rem] p-5 border-2 flex justify-between items-center" style={{ borderColor: JAPAN_TEAL, boxShadow: '6px 6px 0px 0px #065f46' }}>
+                                    <h2 className="font-black" style={{ color: JAPAN_TEAL }}>今日狀態</h2>
+                                    <div className="text-sm font-bold" style={{ color: JAPAN_TEAL }}>{todayKey}</div>
+                                </div>
+                                <div className="grid gap-4">
+                                    <StatusCard label="練功狀態" active={dailyLogs[todayKey]?.isPracticing} />
+                                    <StatusCard label="五分鐘狀態" active={dailyLogs[todayKey]?.isFiveMin} />
+                                </div>
+                                <button onClick={() => setShowLogModal(true)} className="w-full bg-[#beff64] border-2 rounded-2xl p-5 flex items-center justify-center space-x-2 font-black shadow-[4px_4px_0px_0px_#065f46]" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}>
+                                    <Plus /> <span>今日打卡</span>
+                                </button>
+                            </>
+                        )}
+
+                        {activeTab === 'calendar' && (
+                            <div className="text-center p-10 font-bold opacity-50">日曆功能開發中...</div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <div className="text-center space-y-6">
+                                <div className="w-24 h-24 bg-[#beff64] rounded-3xl border-2 mx-auto flex items-center justify-center shadow-[6px_6px_0px_0px_#065f46]" style={{ borderColor: JAPAN_TEAL }}>
+                                    {user?.photoURL ? <img src={user.photoURL} className="rounded-2xl" /> : <User size={40} style={{ color: JAPAN_TEAL }} />}
+                                </div>
+                                <h2 className="text-2xl font-black" style={{ color: JAPAN_TEAL }}>{user?.displayName || (user?.isAnonymous ? "匿名隊員" : "載入中...")}</h2>
+                                <button onClick={() => signOut(auth)} className="text-sm font-bold opacity-40 underline">登出帳號</button>
+                            </div>
+                        )}
                     </main>
 
-                    <nav className="fixed bottom-6 left-6 right-6 max-w-md mx-auto bg-white border-4 rounded-[2.5rem] p-2 flex justify-around shadow-2xl" style={{borderColor: JAPAN_TEAL}}>
-                        <button onClick={() => setActiveTab('dashboard')} className="p-4"><i data-lucide="layout-grid"></i></button>
-                        <button onClick={() => setActiveTab('ranking')} className="p-4 opacity-30"><i data-lucide="trophy"></i></button>
-                        <button onClick={() => setActiveTab('profile')} className="p-4 opacity-30"><i data-lucide="user"></i></button>
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xs bg-white border-2 rounded-full p-2 flex justify-around shadow-[6px_6px_0px_0px_#065f46]" style={{ borderColor: JAPAN_TEAL }}>
+                        <NavBtn active={activeTab === 'dashboard'} icon={<Smile />} onClick={() => setActiveTab('dashboard')} />
+                        <NavBtn active={activeTab === 'calendar'} icon={<Calendar />} onClick={() => setActiveTab('calendar')} />
+                        <NavBtn active={activeTab === 'profile'} icon={<User />} onClick={() => setActiveTab('profile')} />
                     </nav>
 
-                    {showModal && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
-                            <div className="bg-white p-8 rounded-[3rem] border-4 w-full max-w-xs text-center" style={{borderColor: JAPAN_TEAL}}>
-                                <h2 className="text-2xl font-black mb-6">完成運動了？</h2>
-                                <button onClick={handleLog} className="w-full py-4 bg-[#beff64] border-2 rounded-2xl font-black text-xl mb-4" style={{borderColor: JAPAN_TEAL}}>確認 (+5min)</button>
-                                <button onClick={() => setShowModal(false)} className="text-gray-400 font-bold">取消</button>
+                    {showLogModal && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-sm rounded-[2.5rem] border-2 p-8 shadow-[10px_10px_0px_0px_#065f46]" style={{ borderColor: JAPAN_TEAL }}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-black" style={{ color: JAPAN_TEAL }}>今日打卡</h3>
+                                    <XCircle onClick={() => setShowLogModal(false)} className="cursor-pointer" />
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => setIsPracticing(!isPracticing)} className={`p-4 border-2 rounded-xl font-black transition-colors ${isPracticing ? 'bg-[#beff64]' : 'bg-gray-50'}`} style={{ borderColor: JAPAN_TEAL }}>練功</button>
+                                        <button onClick={() => setIsFiveMin(!isFiveMin)} className={`p-4 border-2 rounded-xl font-black transition-colors ${isFiveMin ? 'bg-[#beff64]' : 'bg-gray-50'}`} style={{ borderColor: JAPAN_TEAL }}>五分鐘</button>
+                                    </div>
+                                    <button onClick={handleSave} className="w-full bg-[#beff64] border-2 py-4 rounded-xl font-black shadow-[4px_4px_0px_0px_#065f46] active:translate-y-1 active:shadow-none transition-all" style={{ borderColor: JAPAN_TEAL }}>確認完成</button>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             );
-        }
+        };
+
+        const StatusCard = ({ label, active }) => (
+            <div className="bg-white rounded-2xl p-4 border-2 flex justify-between items-center" style={{ borderColor: JAPAN_TEAL }}>
+                <span className="font-bold" style={{ color: JAPAN_TEAL }}>{label}</span>
+                <div className={`px-3 py-1 rounded-full text-xs font-black border-2 ${active ? 'bg-[#beff64]' : 'bg-gray-100 opacity-50'}`} style={{ borderColor: JAPAN_TEAL }}>
+                    {active ? '已完成' : '未打卡'}
+                </div>
+            </div>
+        );
+
+        const NavBtn = ({ active, icon, onClick }) => (
+            <button onClick={onClick} className={`p-3 rounded-full transition-all ${active ? 'bg-[#beff64] border-2' : 'opacity-30'}`} style={active ? { borderColor: JAPAN_TEAL } : {}}>
+                {React.cloneElement(icon, { size: 24, strokeWidth: 3, style: { color: JAPAN_TEAL } })}
+            </button>
+        );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
-        setTimeout(() => lucide.createIcons(), 500); // 延遲載入圖示
     </script>
 </body>
 </html>
-
