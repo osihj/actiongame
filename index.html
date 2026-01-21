@@ -61,7 +61,7 @@ const COMMON_TIME_OPTIONS = generateTimeOptions(5, 30);
 
 // 自定義笑臉或狀態點
 const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, type = "smile" }) => {
-  // 確保 size 為純數字，避免傳入 "{size}" 導致 SVG 報錯
+  // 使用 Tailwind 類別控制尺寸，這裡預設對應 w-6 h-6 (24px)
   const s = parseInt(size) || 20;
 
   if (!active) return <div style={{ width: `${s}px`, height: `${s}px`, borderColor: '#f3f4f6' }} className="rounded-full border-2 bg-gray-50/50" />;
@@ -71,7 +71,7 @@ const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, typ
   }
 
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="10" fill={color} stroke={JAPAN_TEAL} strokeWidth="1.8"/>
       <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
       <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
@@ -395,16 +395,12 @@ const App = () => {
           <h1 className="text-xl font-black tracking-tight">自律動起來</h1>
         </div>
         <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl bg-[#beff64] border-2 flex items-center justify-center hover:translate-y-[-2px] transition-transform overflow-hidden" style={{ borderColor: JAPAN_TEAL, boxShadow: `3px 3px 0px 0px ${JAPAN_TEAL}` }}>
-           {user && user.photoURL && !imgError ? (
-             <img 
-               src={user.photoURL} 
-               alt="User" 
-               className="w-full h-full object-cover" 
-               onError={() => setImgError(true)} 
-             />
-           ) : (
-             <User size={20} strokeWidth={3} style={{ color: JAPAN_TEAL }} />
-           )}
+           <img 
+             src={user?.photoURL || 'https://www.gravatar.com/avatar/?d=mp'} 
+             className="w-10 h-10 rounded-full border-2 border-[#065f46]"
+             alt="Profile"
+             onError={(e) => { e.target.onerror = null; e.target.src='https://www.gravatar.com/avatar/?d=mp'; }}
+           />
         </button>
       </header>
 
