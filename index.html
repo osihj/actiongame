@@ -71,7 +71,7 @@ const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, typ
   }
 
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="10" fill={color} stroke={JAPAN_TEAL} strokeWidth="1.8"/>
       <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
       <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
@@ -627,3 +627,4 @@ const RankingFilterBtn = ({ active, onClick, label }) => (
 );
 
 export default App;
+
