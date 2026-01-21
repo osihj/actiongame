@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自律動起來 - 線上版</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // 你的 Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+            authDomain: "actiongame-7c8c9.firebaseapp.com",
+            projectId: "actiongame-7c8c9",
+            storageBucket: "actiongame-7c8c9.firebasestorage.app",
+            messagingSenderId: "386021872588",
+            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
+            measurementId: "G-W6CNY1D4RL"
+        };
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        // 將 Firebase 實例掛載到 window，讓下面的 React 程式碼可以用
+        window.fb = { db, auth, provider, doc, setDoc, getDoc, onSnapshot, signInWithPopup, signOut };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [totalMins, setTotalMins] = useState(0);
+            const [showModal, setShowModal] = useState(false);
+            const JAPAN_TEAL = "#065f46";
+            const LIGHT_LIME = "#beff64";
+
+            // 監聽登入狀態與資料庫
+            useEffect(() => {
+                const unsubscribeAuth = window.fb.auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    if (u) {
+                        // 監聽該使用者的 Firestore 資料
+                        const userDoc = window.fb.doc(window.fb.db, "users", u.uid);
+                        window.fb.onSnapshot(userDoc, (docSnap) => {
+                            if (docSnap.exists()) {
+                                setTotalMins(docSnap.data().totalMins || 0);
+                            }
+                        });
+                    }
+                });
+                return () => unsubscribeAuth();
+            }, []);
+
+            const handleLogin = async () => {
+                try {
+                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
+                } catch (err) { alert("登入失敗: " + err.message); }
+            };
+
+            const handleAddMins = async () => {
+                if (!user) return alert("請先登入！");
+                const newTotal = totalMins + 5;
+                const userDoc = window.fb.doc(window.fb.db, "users", user.uid);
+                await window.fb.setDoc(userDoc, { totalMins: newTotal }, { merge: true });
+                
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setShowModal(false);
+            };
+
+            return (
+                <div className="min-h-screen pb-24 font-sans text-gray-800">
+                    <header className="p-5 border-b-2 bg-white flex justify-between items-center" style={{ borderColor: JAPAN_TEAL }}>
+                        <h1 className="text-xl font-black" style={{ color: JAPAN_TEAL }}>自律動起來</h1>
+                        {user ? (
+                            <img src={user.photoURL} className="w-10 h-10 rounded-full border-2" style={{ borderColor: JAPAN_TEAL }} />
+                        ) : (
+                            <button onClick={handleLogin} className="px-4 py-1 text-sm font-bold border-2 rounded-lg" style={{ borderColor: JAPAN_TEAL }}>登入</button>
+                        )}
+                    </header>
+
+                    <main className="max-w-md mx-auto p-6 mt-10">
+                        <div className="bg-white p-10 rounded-[2.5rem] border-4 shadow-[8px_8px_0px_0px_rgba(6,95,70,1)] text-center" style={{ borderColor: JAPAN_TEAL }}>
+                            <p className="text-sm font-bold opacity-40 uppercase mb-2">My Progress</p>
+                            <div className="text-7xl font-black text-emerald-500 mb-8">{totalMins} <span className="text-xl">min</span></div>
+                            <button 
+                                onClick={() => setShowModal(true)}
+                                className="w-full py-6 bg-[#beff64] border-4 rounded-[2rem] font-black text-2xl shadow-[6px_6px_0px_0px_rgba(6,95,70,1)] active:translate-y-1 active:shadow-none transition-all"
+                                style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}
+                            >
+                                + 今日打卡記錄
+                            </button>
+                        </div>
+                    </main>
+
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+                            <div className="bg-white p-8 rounded-[2.5rem] border-4 w-full max-w-xs text-center" style={{ borderColor: JAPAN_TEAL }}>
+                                <h2 className="text-2xl font-black mb-6">完成運動了？</h2>
+                                <button onClick={handleAddMins} className="w-full py-4 bg-[#beff64] border-2 rounded-2xl font-black text-xl mb-4" style={{ borderColor: JAPAN_TEAL }}>確認 (+5min)</button>
+                                <button onClick={() => setShowModal(false)} className="text-gray-400 font-bold">取消</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
