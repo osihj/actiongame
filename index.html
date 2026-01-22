@@ -1,15 +1,90 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>日系極簡自律打卡 App</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/lucide@0.277.0/dist/lucide.esm.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <style>
+    body { background: #FFFFFF; font-family: sans-serif; }
+    .card { border: 2px solid #065f46; box-shadow: 6px 6px 0 #065f46; border-radius: 1.5rem; }
+    .status-indicator { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .nav-item { flex: 1; text-align: center; }
+    .nav-fixed { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); width: 90%; background: #FFFFFF; border-radius: 1.5rem; box-shadow: 6px 6px 0 #065f46; display: flex; justify-content: space-around; padding: 8px 0; }
+    .btn-press { transition: transform 0.1s; }
+    .btn-press:active { transform: translateY(2px); box-shadow: 3px 3px 0 #065f46; }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="flex-1 p-4 space-y-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+      <h1 class="text-xl font-bold text-[#065f46]">自律打卡</h1>
+      <div class="w-12 h-12 rounded-xl bg-[#065f46] flex items-center justify-center text-white cursor-pointer" id="profile-btn">👤</div>
+    </div>
+
+    <!-- 本週累計卡片 -->
+    <div class="card p-4 flex justify-between items-center bg-white">
+      <span class="font-semibold text-[#065f46]">本週累計</span>
+      <span id="weekly-total" class="text-2xl font-black text-[#FACC15]">0 min</span>
+    </div>
+
+    <!-- 專案狀態卡片 -->
+    <div class="card p-4 space-y-2 bg-white">
+      <div class="flex justify-between items-center">
+        <span class="font-semibold text-[#065f46]" id="project-name">練功</span>
+        <span class="font-bold text-[#065f46]" id="project-count">0 次</span>
+      </div>
+      <div class="flex justify-between" id="week-status">
+        <div class="status-indicator bg-gray-200">日</div>
+        <div class="status-indicator bg-gray-200">一</div>
+        <div class="status-indicator bg-gray-200">二</div>
+        <div class="status-indicator bg-gray-200">三</div>
+        <div class="status-indicator bg-gray-200">四</div>
+        <div class="status-indicator bg-gray-200">五</div>
+        <div class="status-indicator bg-gray-200">六</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 打卡按鈕 -->
+  <button id="log-btn" class="btn-press fixed bottom-40 left-1/2 transform -translate-x-1/2 w-11/12 py-4 bg-[#beff64] text-[#065f46] font-bold text-xl rounded-3xl border-2 border-[#065f46] shadow-[6px_6px_0_#065f46]">
+    + 打卡
+  </button>
+
+  <!-- 底部導覽列 -->
+  <div class="nav-fixed">
+    <div class="nav-item" onclick="showPage('dashboard')">
+      <span class="block">🏠</span>
+      <span class="text-sm text-[#065f46]">首頁</span>
+    </div>
+    <div class="nav-item" onclick="showPage('calendar')">
+      <span class="block">📅</span>
+      <span class="text-sm text-[#065f46]">日曆</span>
+    </div>
+    <div class="nav-item" onclick="showPage('ranking')">
+      <span class="block">🏆</span>
+      <span class="text-sm text-[#065f46]">排行榜</span>
+    </div>
+    <div class="nav-item" onclick="showPage('profile')">
+      <span class="block">👤</span>
+      <span class="text-sm text-[#065f46]">個人</span>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
   <script type="module">
-    // Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-    
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
       authDomain: "actiongame-7c8c9.firebaseapp.com",
@@ -19,143 +94,73 @@
       appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
       measurementId: "G-W6CNY1D4RL"
     };
-    
+
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth();
+    const auth = getAuth(app);
     const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
-    
-    let currentUser = null;
-    
+
+    let userId = null;
+
     async function login() {
-      await signInWithPopup(auth, provider);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      userId = result.user.uid;
+      loadUserData();
     }
-    
-    async function logout() {
-      await signOut(auth);
-    }
-    
-    async function checkIn() {
-      if (!currentUser) return;
-      const userRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userRef);
-      let count = 0;
-      if (docSnap.exists()) {
-        count = docSnap.data().checkinCount || 0;
-        count += 1;
-        await updateDoc(userRef, { checkinCount: count });
-      } else {
-        await setDoc(userRef, { name: currentUser.displayName, checkinCount: 1 });
-        count = 1;
-      }
-      document.getElementById("weekCount").innerText = count;
-      triggerConfetti();
-      updateLeaderboard();
-      updateCalendar();
-    }
-    
-    async function updateLeaderboard() {
-      const q = query(collection(db, "users"), orderBy("checkinCount", "desc"));
-      const querySnapshot = await getDocs(q);
-      const leaderboard = document.getElementById("leaderboard");
-      leaderboard.innerHTML = "";
-      let rank = 1;
-      querySnapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const li = document.createElement("li");
-        li.className = "flex items-center justify-between p-2 border-b border-[#065f46]";
-        li.innerHTML = `<span>#${rank}</span>
-                        <span>${data.name}</span>
-                        <span>${data.checkinCount}</span>`;
-        leaderboard.appendChild(li);
-        rank++;
-      });
-    }
-    
-    function updateCalendar() {
-      const cal = document.getElementById("calendar");
-      cal.innerHTML = "";
-      const days = 7; // 週視圖
-      for (let i=0;i<days;i++) {
-        const dayDiv = document.createElement("div");
-        dayDiv.className = "w-10 h-10 flex items-center justify-center border border-[#065f46] rounded-3xl";
-        dayDiv.innerText = "😃"; // 簡單用笑臉表示已打卡
-        cal.appendChild(dayDiv);
-      }
-    }
-    
-    function triggerConfetti() {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js";
-      script.onload = () => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#beff64', '#FACC15']
-        });
-      };
-      document.body.appendChild(script);
-    }
-    
+
     onAuthStateChanged(auth, (user) => {
-      currentUser = user;
       if (user) {
-        document.getElementById("loginBtn").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "block";
-        document.getElementById("userName").innerText = user.displayName;
-        updateLeaderboard();
-        updateCalendar();
+        userId = user.uid;
+        loadUserData();
       } else {
-        document.getElementById("loginBtn").style.display = "block";
-        document.getElementById("logoutBtn").style.display = "none";
-        document.getElementById("userName").innerText = "";
+        login();
       }
     });
-    
-    window.login = login;
-    window.logout = logout;
-    window.checkIn = checkIn;
+
+    async function loadUserData() {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          weeklyTotal: 0,
+          projects: { "練功": Array(7).fill(false) }
+        });
+      }
+      updateUI();
+    }
+
+    async function updateUI() {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      const data = docSnap.data();
+      const project = "練功";
+      document.getElementById("weekly-total").textContent = `${data.weeklyTotal} min`;
+      document.getElementById("project-count").textContent = `${data.projects[project].filter(v=>v).length} 次`;
+      const weekStatus = document.getElementById("week-status").children;
+      data.projects[project].forEach((done, i) => {
+        weekStatus[i].textContent = done ? "😊" : ["日","一","二","三","四","五","六"][i];
+        weekStatus[i].style.background = done ? "#FACC15" : "gray";
+      });
+    }
+
+    document.getElementById("log-btn").addEventListener("click", async () => {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      const data = docSnap.data();
+      const project = "練功";
+      const today = new Date().getDay(); // 0(日)~6(六)
+      if (!data.projects[project][today]) {
+        data.projects[project][today] = true;
+        data.weeklyTotal += 5; // 每次打卡增加 5 分鐘
+        await updateDoc(docRef, data);
+        updateUI();
+        confetti({ colors: ['#beff64','#FACC15'] });
+      }
+    });
+
+    function showPage(page) {
+      alert("切換頁面功能尚未完成，本範例以 Dashboard 為主展示。");
+    }
   </script>
-  <style>
-    body { font-family: sans-serif; background: #F9FAFB; color: #065f46; margin:0; padding:0; }
-    .btn { padding: 1rem 2rem; border-radius: 2rem; border: 2px solid #065f46; background: #beff64; cursor:pointer; font-weight:bold; box-shadow: 6px 6px #065f46; transition: transform 0.1s; }
-    .btn:active { transform: translateY(2px); }
-    nav { position: fixed; bottom:0; left:50%; transform: translateX(-50%); width:95%; display:flex; justify-around; padding:0.5rem; background:#FFFFFF; border-radius:2rem; box-shadow:0 6px #065f46; }
-    .card { background:#FFFFFF; border:2px solid #065f46; border-radius:2rem; padding:1rem; margin:1rem; box-shadow:6px 6px #065f46; }
-    #calendar { display:flex; gap:4px; margin:1rem 0; }
-    #leaderboard { list-style:none; padding:0; margin:0; }
-    #leaderboard li { display:flex; justify-content:space-between; }
-  </style>
-</head>
-<body>
-  <header class="card">
-    <span id="userName"></span>
-    <button id="loginBtn" class="btn" onclick="login()">Google 登入</button>
-    <button id="logoutBtn" class="btn" onclick="logout()" style="display:none;">登出</button>
-  </header>
-
-  <main class="card">
-    <h2>本週累計分鐘數</h2>
-    <div id="weekCount" class="text-3xl font-black text-[#FACC15]">0</div>
-    <button class="btn mt-4" onclick="checkIn()">＋ 打卡</button>
-  </main>
-
-  <section class="card">
-    <h2>日曆 (週視圖)</h2>
-    <div id="calendar"></div>
-  </section>
-
-  <section class="card">
-    <h2>排行榜</h2>
-    <ol id="leaderboard"></ol>
-  </section>
-
-  <nav>
-    <button>首頁</button>
-    <button>日曆</button>
-    <button>排行榜</button>
-    <button>個人</button>
-  </nav>
 </body>
 </html>
