@@ -23,8 +23,8 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; margin: 0; }
-        .neo-brutalism { border: 4px solid #065f46; box-shadow: 6px 6px 0px 0px #065f46; }
-        .active-press:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px 0px #065f46; }
+        .neo-border { border: 4px solid #065f46; }
+        .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
     </style>
 </head>
 <body>
@@ -50,27 +50,27 @@
     </script>
 
     <script type="text/babel">
-        const JAPAN_TEAL = "#065f46";
-
-        // 核心修正：使用原生 Lucide 渲染，避免 "Element type is invalid"
-        const SafeIcon = ({ name, size = 24, className = "" }) => {
+        // 1. 修正後的圖示組件：不使用 React.createElement，改用 innerHTML 注入
+        const Icon = ({ name, size = 24, className = "" }) => {
             const iconRef = React.useRef(null);
 
             React.useEffect(() => {
                 if (window.lucide && iconRef.current) {
-                    window.lucide.createIcons({
-                        icons: { [name]: window.lucide.icons[name] },
-                        attrs: { 
-                            width: size, 
-                            height: size, 
-                            stroke: JAPAN_TEAL, 
-                            "stroke-width": 3 
-                        }
-                    });
+                    // 清除舊圖示
+                    iconRef.current.innerHTML = "";
+                    // 建立新圖示元素
+                    const iconElement = window.lucide.createElement(window.lucide.icons[name]);
+                    // 設定屬性
+                    iconElement.setAttribute('width', size);
+                    iconElement.setAttribute('height', size);
+                    iconElement.setAttribute('stroke', '#065f46');
+                    iconElement.setAttribute('stroke-width', '3');
+                    iconElement.setAttribute('class', className);
+                    iconRef.current.appendChild(iconElement);
                 }
-            }, [name, size]);
+            }, [name, size, className]);
 
-            return <i ref={iconRef} data-lucide={name} className={className}></i>;
+            return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
         };
 
         function App() {
@@ -87,27 +87,21 @@
                         clearInterval(checkFB);
                     }
                 }, 200);
-                return () => clearInterval(checkFB);
             }, []);
 
-            const login = () => window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
-            const logout = () => window.fb.signOut(window.fb.auth);
-
-            if (loading) return (
-                <div className="h-screen flex items-center justify-center font-black text-[#065f46] animate-pulse">
-                    系統啟動中...
-                </div>
-            );
+            if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#065f46]">系統啟動中...</div>;
 
             if (!user) {
                 return (
-                    <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
-                        <div className="bg-white p-12 rounded-[3rem] neo-brutalism animate-in">
-                            <h1 className="text-4xl font-black mb-4 text-[#065f46]">自律動起來</h1>
-                            <p className="text-gray-400 font-bold mb-8">GYM & HABIT TRACKER</p>
-                            <button onClick={login} className="bg-[#beff64] border-2 border-[#065f46] px-8 py-4 rounded-2xl font-black text-xl flex items-center space-x-3 active-press transition-all">
-                                <SafeIcon name="log-in" />
-                                <span>Google 帳號登入</span>
+                    <div className="h-screen flex items-center justify-center p-6">
+                        <div className="bg-white p-12 rounded-[3rem] neo-border neo-shadow text-center">
+                            <h1 className="text-4xl font-black mb-8 text-[#065f46]">自律動起來</h1>
+                            <button 
+                                onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)}
+                                className="bg-[#beff64] border-2 border-[#065f46] px-8 py-4 rounded-2xl font-black text-xl flex items-center space-x-3 active:translate-x-1 active:translate-y-1 transition-all"
+                            >
+                                <Icon name="logIn" />
+                                <span>Google 登入</span>
                             </button>
                         </div>
                     </div>
@@ -115,56 +109,42 @@
             }
 
             return (
-                <div className="max-w-md mx-auto p-4 pt-8 pb-32">
-                    {/* 使用者狀態欄 */}
-                    <div className="flex justify-between items-center bg-white p-4 rounded-3xl neo-brutalism mb-8">
+                <div className="max-w-md mx-auto p-4 pt-8">
+                    {/* Header */}
+                    <div className="flex justify-between items-center bg-white p-4 rounded-3xl neo-border neo-shadow mb-8">
                         <div className="flex items-center space-x-3">
-                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" alt="User" />
-                            <div>
-                                <p className="text-[10px] text-gray-400 font-black uppercase">Lv.1 Beginner</p>
-                                <p className="font-black text-[#065f46]">{user.displayName}</p>
-                            </div>
+                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" />
+                            <span className="font-black text-[#065f46]">{user.displayName}</span>
                         </div>
-                        <div className="bg-[#beff64] px-4 py-2 rounded-xl border-2 border-[#065f46] flex items-center space-x-2">
-                            <SafeIcon name="flame" size={20} />
+                        <div className="bg-[#beff64] px-4 py-2 rounded-xl border-2 border-[#065f46] flex items-center space-x-1">
+                            <Icon name="flame" size={18} />
                             <span className="font-black text-[#065f46]">12</span>
                         </div>
                     </div>
 
-                    {/* 日曆主區塊 */}
-                    <div className="bg-white p-6 rounded-[2.5rem] neo-brutalism min-h-[350px]">
-                        <div className="flex justify-between items-center mb-8 px-2">
-                            <button className="p-2 border-2 border-[#065f46] rounded-xl"><SafeIcon name="chevron-left" size={20} /></button>
-                            <span className="font-black text-2xl text-[#065f46]">2026年 1月</span>
-                            <button className="p-2 border-2 border-[#065f46] rounded-xl"><SafeIcon name="chevron-right" size={20} /></button>
+                    {/* 日曆預覽 */}
+                    <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow">
+                        <div className="flex justify-between items-center mb-6">
+                            <Icon name="chevronLeft" />
+                            <span className="font-black text-xl text-[#065f46]">2026年 1月</span>
+                            <Icon name="chevronRight" />
                         </div>
-                        <div className="grid grid-cols-7 gap-y-4 text-center">
-                            {['日','一','二','三','四','五','六'].map(d => (
-                                <div key={d} className="font-black text-gray-300 text-sm uppercase">{d}</div>
+                        <div className="grid grid-cols-7 gap-2 text-center text-gray-300 font-black">
+                            {['日','一','二','三','四','五','六'].map(d => <div key={d}>{d}</div>)}
+                            {Array.from({length: 31}).map((_, i) => (
+                                <div key={i} className="py-2 text-[#065f46] font-bold">{i+1}</div>
                             ))}
-                            {Array.from({length: 31}).map((_, i) => {
-                                const isToday = (i + 1) === new Date().getDate();
-                                return (
-                                    <div key={i} className={`py-2 text-xl font-black rounded-xl transition-all ${isToday ? 'bg-[#beff64] text-[#065f46] border-2 border-[#065f46]' : 'text-[#065f46] opacity-60'}`}>
-                                        {i + 1}
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
 
-                    {/* 底部導航欄 */}
-                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-[10px_10px_0px_0px_rgba(6,95,70,0.2)]">
-                        <button className="p-4 bg-[#beff64] rounded-full border-2 border-[#065f46]"><SafeIcon name="calendar" /></button>
-                        <button className="p-4 opacity-30 hover:opacity-100 transition-opacity"><SafeIcon name="trophy" /></button>
-                        <button onClick={logout} className="p-4 opacity-30 hover:opacity-100 transition-opacity"><SafeIcon name="log-out" /></button>
+                    {/* Navigation */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-2xl">
+                        <button className="p-4"><Icon name="calendar" /></button>
+                        <button className="p-4 opacity-30"><Icon name="trophy" /></button>
+                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-30 text-red-600"><Icon name="logOut" /></button>
                     </nav>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        const root = ReactDOM.createRoot(document.getElementById('
