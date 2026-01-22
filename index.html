@@ -1,162 +1,753 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="UTF-8">
-  <title>自律打卡 SPA</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script type="module" src="https://unpkg.com/lucide@0.258.0/dist/lucide.esm.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <style>
-    .hard-shadow { box-shadow: 6px 6px 0 #065f46; }
-    .btn-press:active { transform: translateY(2px); box-shadow: 2px 2px 0 #065f46; }
-    .status-circle { width: 24px; height: 24px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; }
-    .page { display:none; }
-    .active { display:block; }
-  </style>
-</head>
-<body class="bg-white font-sans">
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Calendar, Trophy, User, Plus, ChevronLeft, ChevronRight,
+  Clock, Flame, XCircle, LayoutGrid, Rows, LogIn, Mail,
+  Target, Dumbbell, Smile, Zap, LogOut, Award, BarChart3,
+  Medal
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
 
-  <!-- Header -->
-  <header class="flex justify-between items-center p-4 border-b-2 border-[#065f46] hard-shadow">
-    <div class="font-bold text-[#065f46]">🏯 My Habit</div>
-    <div class="rounded-3xl w-10 h-10 bg-[#065f46] cursor-pointer"></div>
-  </header>
+// Firebase 模組導入
+import { initializeApp } from "firebase/app";
+import { 
+  getFirestore, collection, doc, setDoc, getDoc,
+  onSnapshot, serverTimestamp 
+} from "firebase/firestore";
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signInWithCustomToken, 
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInAnonymously
+} from "firebase/auth";
 
-  <!-- Pages -->
-  <main class="p-4 space-y-4">
+// --- Firebase 設定 ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
 
-    <!-- Dashboard -->
-    <div id="page-dashboard" class="page active">
-      <div class="w-full p-4 border-2 border-[#065f46] rounded-3xl hard-shadow flex justify-between items-center">
-        <span class="font-black text-[#065f46]">本週累計</span>
-        <span class="font-black text-[#FACC15] text-xl">120 min</span>
+// 初始化 Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'self-discipline-app';
+
+// 顏色定義
+const BRAND_GREEN = "#beff64";
+const NIPPON_YELLOW = "#FACC15";
+const JAPAN_TEAL = "#065f46";   // 日系藍綠色
+
+// 生成時間選項
+const generateTimeOptions = (min, max) => {
+  const options = [];
+  for (let i = min; i <= max; i += 5) {
+    options.push(i);
+  }
+  return options;
+};
+
+const formatTimeLabel = (totalMins) => {
+  return `${totalMins} 分鐘`;
+};
+
+const COMMON_TIME_OPTIONS = generateTimeOptions(5, 30);
+
+// 自定義笑臉或狀態點
+const StatusIndicator = ({ size = 20, active = false, color = NIPPON_YELLOW, type = "smile" }) => {
+  if (!active) return <div style={{ width: size, height: size, borderColor: '#f3f4f6' }} className="rounded-full border-2 bg-gray-50/50" />;
+  
+  if (type === "dot") {
+    return <div style={{ width: size, height: size, backgroundColor: JAPAN_TEAL, borderColor: JAPAN_TEAL }} className="rounded-full border-2" />;
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="10" fill={color} stroke={JAPAN_TEAL} strokeWidth="1.8"/>
+      <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
+      <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
+      <path d="M8 15C8.5 16.5 10 17.5 12 17.5C14 17.5 15.5 16.5 16 15" stroke={JAPAN_TEAL} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+};
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [allUsersInfo, setAllUsersInfo] = useState([]); // 儲存基本資料
+  const [dailyLogs, setDailyLogs] = useState({});
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState('month');
+  const [rankingType, setRankingType] = useState('totalMins'); 
+
+  // 打卡狀態
+  const [isPracticing, setIsPracticing] = useState(false);
+  const [isFiveMin, setIsFiveMin] = useState(false);
+  const [isWorkout, setIsWorkout] = useState(false);
+  const [isStretch, setIsStretch] = useState(false);
+  const [workoutMins, setWorkoutMins] = useState(5);
+  const [stretchMins, setStretchMins] = useState(5);
+
+  const getDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayKey = useMemo(() => getDateKey(new Date()), []);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          // 如果沒有特定 token，維持原有的匿名狀態
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth Init Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 實作 Google 登入邏輯
+  const handleGoogleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      // 彈出視窗進行登入
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log("登入成功！使用者名稱：", user.displayName);
+      
+      // 同步使用者資料到公共資料庫 (初次或更新)
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+      await setDoc(userRef, {
+        displayName: user.displayName || `使用者 ${user.uid.slice(0, 5)}`,
+        photoURL: user.photoURL || null,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+
+    } catch (error) {
+      console.error("登入失敗", error);
+    }
+  };
+
+  // 監聽所有使用者資訊
+  useEffect(() => {
+    if (!user) return;
+    const publicUsersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+    const unsubscribe = onSnapshot(publicUsersRef, (snapshot) => {
+      const data = [];
+      snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+      setAllUsersInfo(data);
+    }, (error) => console.error("Users Info Error:", error));
+    return () => unsubscribe();
+  }, [user]);
+
+  // 監聽當前使用者的 Logs
+  useEffect(() => {
+    if (!user) return;
+    const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'logs');
+    const unsubscribe = onSnapshot(logsRef, (snapshot) => {
+      const logs = {};
+      snapshot.forEach(doc => { logs[doc.id] = doc.data(); });
+      setDailyLogs(logs);
+    }, (error) => console.error("Logs Error:", error));
+    return () => unsubscribe();
+  }, [user]);
+
+  // --- 統計計算 ---
+  const startOfWeekKey = useMemo(() => {
+    const now = new Date();
+    const diff = now.getDate() - now.getDay();
+    const firstDayOfWeek = new Date(now.setDate(diff));
+    firstDayOfWeek.setHours(0, 0, 0, 0);
+    return getDateKey(firstDayOfWeek);
+  }, []);
+
+  const weeklyStats = useMemo(() => {
+    let practiceCount = 0;
+    let fiveMinCount = 0;
+    let totalWorkoutMins = 0;
+    let totalStretchMins = 0;
+    let totalMins = 0;
+
+    Object.keys(dailyLogs).forEach(dateKey => {
+      if (dateKey >= startOfWeekKey) {
+        const log = dailyLogs[dateKey];
+        practiceCount += (log.practiceCount || 0);
+        fiveMinCount += (log.fiveMinCount || 0);
+        totalWorkoutMins += (log.workoutMins || 0);
+        totalStretchMins += (log.stretchMins || 0);
+        totalMins += (log.workoutMins || 0) + (log.stretchMins || 0);
+      }
+    });
+    return { practiceCount, fiveMinCount, workoutMins: totalWorkoutMins, stretchMins: totalStretchMins, totalMins };
+  }, [dailyLogs, startOfWeekKey]);
+
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const yearMonthPrefix = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    let practiceCount = 0;
+    let fiveMinCount = 0;
+    let workoutMinsSum = 0;
+    let stretchMinsSum = 0;
+    let totalMins = 0;
+
+    Object.keys(dailyLogs).forEach(dateKey => {
+      if (dateKey.startsWith(yearMonthPrefix)) {
+        const log = dailyLogs[dateKey];
+        practiceCount += (log.practiceCount || 0);
+        fiveMinCount += (log.fiveMinCount || 0);
+        workoutMinsSum += (log.workoutMins || 0);
+        stretchMinsSum += (log.stretchMins || 0);
+        totalMins += (log.workoutMins || 0) + (log.stretchMins || 0);
+      }
+    });
+    return { practiceCount, fiveMinCount, workoutMins: workoutMinsSum, stretchMins: stretchMinsSum, totalMins };
+  }, [dailyLogs]);
+
+  const sortedRankings = useMemo(() => {
+    return [...allUsersInfo].sort((a, b) => (b[rankingType] || 0) - (a[rankingType] || 0));
+  }, [allUsersInfo, rankingType]);
+
+  const changeDateRange = (offset) => {
+    if (calendarView === 'month') {
+      setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
+    } else {
+      setSelectedDate(prev => {
+        const newDate = new Date(prev);
+        newDate.setDate(prev.getDate() + (offset * 7));
+        return newDate;
+      });
+    }
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const handleLogout = async () => {
+    try { await signOut(auth); } catch (err) { console.error("登出錯誤:", err); }
+  };
+
+  const handleSaveRecord = async () => {
+    if (!user) return;
+    const dateKey = todayKey;
+    const logRef = doc(db, 'artifacts', appId, 'users', user.uid, 'logs', dateKey);
+    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+
+    try {
+      const logSnap = await getDoc(logRef);
+      const existingData = logSnap.exists() ? logSnap.data() : { 
+        practiceCount: 0, 
+        fiveMinCount: 0, 
+        workoutMins: 0, 
+        stretchMins: 0,
+        isPracticing: false,
+        isFiveMin: false,
+        isWorkout: false,
+        isStretch: false
+      };
+
+      const addedWorkoutMins = (isWorkout ? parseInt(workoutMins) : 0);
+      const addedStretchMins = (isStretch ? parseInt(stretchMins) : 0);
+      const addedTotalMins = addedWorkoutMins + addedStretchMins;
+
+      const logData = {
+        isPracticing: existingData.isPracticing || isPracticing,
+        isFiveMin: existingData.isFiveMin || isFiveMin,
+        isWorkout: existingData.isWorkout || isWorkout,
+        isStretch: existingData.isStretch || isStretch,
+        practiceCount: (existingData.practiceCount || 0) + (isPracticing ? 1 : 0),
+        fiveMinCount: (existingData.fiveMinCount || 0) + (isFiveMin ? 1 : 0),
+        workoutMins: (existingData.workoutMins || 0) + addedWorkoutMins,
+        stretchMins: (existingData.stretchMins || 0) + addedStretchMins,
+        timestamp: serverTimestamp()
+      };
+
+      await setDoc(logRef, logData);
+      
+      const prevUserEntry = allUsersInfo.find(u => u.id === user.uid);
+      
+      await setDoc(userRef, {
+        displayName: user.displayName || `使用者 ${user.uid.slice(0, 5)}`,
+        photoURL: user.photoURL || null,
+        totalMins: (prevUserEntry?.totalMins || 0) + addedTotalMins,
+        practiceCount: (prevUserEntry?.practiceCount || 0) + (isPracticing ? 1 : 0),
+        fiveMinCount: (prevUserEntry?.fiveMinCount || 0) + (isFiveMin ? 1 : 0),
+        workoutMins: (prevUserEntry?.workoutMins || 0) + addedWorkoutMins,
+        stretchMins: (prevUserEntry?.stretchMins || 0) + addedStretchMins,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: [BRAND_GREEN, NIPPON_YELLOW] });
+      setShowLogModal(false);
+      setIsPracticing(false); setIsFiveMin(false); setIsWorkout(false); setIsStretch(false);
+      setWorkoutMins(5); setStretchMins(5);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const calendarDays = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    
+    if (calendarView === 'month') {
+      const firstDayOfMonth = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const days = [];
+      for (let i = 0; i < firstDayOfMonth; i++) days.push(null);
+      for (let i = 1; i <= daysInMonth; i++) days.push(i);
+      return days;
+    } else {
+      const current = new Date(selectedDate);
+      const dayOfWeek = current.getDay();
+      const diff = current.getDate() - dayOfWeek;
+      const startOfWeek = new Date(current.getFullYear(), current.getMonth(), diff);
+      
+      return Array(7).fill(0).map((_, i) => {
+        const d = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i);
+        return { 
+          day: d.getDate(), 
+          month: d.getMonth() + 1,
+          fullDate: getDateKey(d) 
+        };
+      });
+    }
+  }, [selectedDate, calendarView]);
+
+  const weekDaysLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+  const getWeekOfMonth = (date) => {
+    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const dayOfMonth = date.getDate();
+    const offset = firstDayOfMonth.getDay();
+    return Math.ceil((dayOfMonth + offset) / 7);
+  };
+
+  const WeeklyProjectStatus = ({ type, label }) => (
+    <div className="bg-white rounded-[1.5rem] p-5 border-2 flex flex-col w-full" style={{ borderColor: JAPAN_TEAL, boxShadow: `6px 6px 0px 0px ${JAPAN_TEAL}` }}>
+      <div className="flex flex-row justify-center items-baseline mb-2 space-x-3">
+        <span className="text-xl font-black" style={{ color: JAPAN_TEAL }}>{label}</span>
+        <div className="flex items-baseline space-x-1">
+          <span className="text-2xl font-black" style={{ color: JAPAN_TEAL }}>
+            {type === 'practice' ? weeklyStats.practiceCount : weeklyStats.fiveMinCount}
+          </span>
+          <span className="text-xs font-black opacity-60" style={{ color: JAPAN_TEAL }}>次累計/週</span>
+        </div>
       </div>
-      <div class="grid grid-cols-2 gap-4 mt-4">
-        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow space-y-2">
-          <div class="font-bold text-[#065f46]">練功 (3/7)</div>
-          <div class="flex justify-between">
-            <div class="status-circle bg-[#FACC15]">😄</div>
-            <div class="status-circle bg-[#FACC15]">😄</div>
-            <div class="status-circle bg-[#FACC15]">😄</div>
-            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+      <div className="flex justify-center gap-x-[3pt] items-center border-t pt-3" style={{ borderColor: `${JAPAN_TEAL}1a` }}>
+        {weekDaysLabels.map((dayName, i) => {
+          const d = new Date(); 
+          const diff = d.getDate() - d.getDay();
+          const targetDay = new Date(d.getFullYear(), d.getMonth(), diff + i);
+          const key = getDateKey(targetDay);
+          const log = dailyLogs[key];
+          const isDone = log && (type === 'practice' ? log.isPracticing : log.isFiveMin);
+          
+          return (
+            <div key={i} className="flex flex-col items-center flex-1">
+              <StatusIndicator active={!!isDone} size={26} type="smile" />
+              <span className="text-[10px] font-black opacity-40 mt-1">{dayName}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // 渲染登入介面
+  if ((!user || user.isAnonymous) && !loading && activeTab === 'profile') {
+    return (
+      <div className="min-h-screen bg-[#beff64] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
+        <div className="relative mb-8">
+          <div className="w-32 h-32 bg-white rounded-full border-4 flex items-center justify-center animate-bounce shadow-[12px_12px_0px_0px_rgba(6,95,70,1)]" style={{ borderColor: JAPAN_TEAL }}>
+            <StatusIndicator size={80} active={true} type="smile" />
+          </div>
+          <Zap size={32} className="absolute -top-4 -right-4 text-emerald-900 fill-emerald-900 rotate-12" />
+        </div>
+        <h1 className="text-5xl font-black mb-2 tracking-tighter" style={{ color: JAPAN_TEAL }}>自律動起來</h1>
+        <p className="text-lg font-bold opacity-70 mb-12" style={{ color: JAPAN_TEAL }}>登入後即可同步數據，與好友一同努力</p>
+        <div className="w-full max-w-xs space-y-4">
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full bg-white border-4 p-4 rounded-3xl flex items-center justify-center space-x-3 hover:translate-y-[-4px] active:translate-y-[0px] transition-all shadow-[8px_8px_0px_0px_rgba(6,95,70,1)] font-black text-lg"
+            style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+            <span>使用 Google 帳號登入</span>
+          </button>
+          <button onClick={() => setActiveTab('dashboard')} className="text-sm font-bold opacity-50 underline" style={{ color: JAPAN_TEAL }}>先隨便逛逛</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="min-h-screen bg-[#beff64] flex items-center justify-center font-black text-xl text-gray-800">載入中...</div>;
+
+  return (
+    <div className="min-h-screen bg-white text-gray-600 font-sans pb-32">
+      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-6 py-5 flex justify-between items-center border-b-2" style={{ borderColor: JAPAN_TEAL }}>
+        <div className="flex items-center space-x-2 text-black" style={{ color: JAPAN_TEAL }}>
+          <div className="w-8 h-8 bg-[#beff64] rounded-lg border-2 flex items-center justify-center" style={{ borderColor: JAPAN_TEAL }}>
+             <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: JAPAN_TEAL }}></div>
+          </div>
+          <h1 className="text-xl font-black tracking-tight">自律動起來</h1>
+        </div>
+        <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl bg-[#beff64] border-2 flex items-center justify-center hover:translate-y-[-2px] transition-transform overflow-hidden" style={{ borderColor: JAPAN_TEAL, boxShadow: `3px 3px 0px 0px ${JAPAN_TEAL}` }}>
+           {user && user.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : <User size={20} strokeWidth={3} style={{ color: JAPAN_TEAL }} />}
+        </button>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-6 py-4">
+        {activeTab === 'dashboard' && (
+          <div className="space-y-4 animate-in fade-in duration-500">
+            <section className="bg-white rounded-[1.5rem] p-5 border-2 flex justify-between items-center" style={{ borderColor: JAPAN_TEAL, boxShadow: `6px 6px 0px 0px ${JAPAN_TEAL}` }}>
+              <h2 className="text-lg font-black tracking-tight" style={{ color: JAPAN_TEAL }}>本週累計自律時間</h2>
+              <div className="flex items-baseline space-x-1">
+                <span className="text-3xl font-black tracking-tighter text-[#33cc99]">
+                  {weeklyStats.totalMins}
+                </span>
+                <span className="text-xs font-black" style={{ color: JAPAN_TEAL }}>min</span>
+              </div>
+            </section>
+            <section className="flex flex-col space-y-4">
+              <WeeklyProjectStatus type="practice" label="練功" />
+              <WeeklyProjectStatus type="fiveMin" label="五分鐘" />
+            </section>
+            <button onClick={() => setShowLogModal(true)} className="w-full bg-[#beff64] border-2 rounded-[1.5rem] p-5 flex items-center justify-center space-x-3 font-black hover:translate-y-[-2px] transition-all" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL, boxShadow: `4px 4px 0px 0px ${JAPAN_TEAL}` }}>
+              <Plus size={24} strokeWidth={3} />
+              <span className="text-lg">今日打卡</span>
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'calendar' && (
+          <div className="space-y-4 animate-in fade-in duration-500">
+             <div className="flex justify-between items-center px-2">
+                <h2 className="text-2xl font-black" style={{ color: JAPAN_TEAL }}>紀錄日曆</h2>
+                <div className="flex items-center space-x-2">
+                  <button onClick={goToToday} className="bg-[#beff64] border-2 px-4 py-1.5 rounded-full font-black text-xs transition-all" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL, boxShadow: `2px 2px 0px 0px ${JAPAN_TEAL}` }}>今日</button>
+                  <div className="flex bg-gray-100 p-1 rounded-xl border-2 scale-90" style={{ borderColor: JAPAN_TEAL }}>
+                    <button onClick={() => setCalendarView('week')} className={`px-3 py-1 rounded-lg transition-all ${calendarView === 'week' ? 'bg-emerald-900 text-white' : 'opacity-50'}`} style={{ color: calendarView === 'week' ? 'white' : JAPAN_TEAL }}><Rows size={14} /></button>
+                    <button onClick={() => setCalendarView('month')} className={`px-3 py-1 rounded-lg transition-all ${calendarView === 'month' ? 'bg-emerald-900 text-white' : 'opacity-50'}`} style={{ color: calendarView === 'month' ? 'white' : JAPAN_TEAL }}><LayoutGrid size={14} /></button>
+                  </div>
+                </div>
+             </div>
+             <div className="bg-white rounded-[2rem] p-6 border-2" style={{ borderColor: JAPAN_TEAL, boxShadow: `8px 8px 0px 0px ${JAPAN_TEAL}` }}>
+                <div className="flex justify-between items-center mb-6 px-2" style={{ color: JAPAN_TEAL }}>
+                  <button onClick={() => changeDateRange(-1)} className="p-2 border-2 rounded-xl" style={{ borderColor: JAPAN_TEAL }}><ChevronLeft size={18} /></button>
+                  <span className="text-lg font-black">
+                    {calendarView === 'month' 
+                      ? `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
+                      : `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月 第${getWeekOfMonth(selectedDate)}週`
+                    }
+                  </span>
+                  <button onClick={() => changeDateRange(1)} className="p-2 border-2 rounded-xl" style={{ borderColor: JAPAN_TEAL }}><ChevronRight size={18} /></button>
+                </div>
+                <div className="grid grid-cols-7 text-center">
+                  {weekDaysLabels.map((d, i) => <div key={i} className="font-black text-gray-300 mb-2 text-[18pt]">{d}</div>)}
+                  
+                  {calendarView === 'month' ? calendarDays.map((day, idx) => {
+                      if (!day) return <div key={idx} className="h-12" />;
+                      const dateObj = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+                      const dateStr = getDateKey(dateObj);
+                      const isToday = dateStr === todayKey;
+                      const isSelected = dateStr === getDateKey(selectedDate);
+                      const log = dailyLogs[dateStr];
+                      const hasLog = log && (log.isPracticing || log.isFiveMin || log.isWorkout || log.isStretch);
+                      
+                      const showBorder = isToday || isSelected;
+
+                      return (
+                        <div key={idx} className="h-12 flex items-center justify-center relative cursor-pointer" onClick={() => setSelectedDate(dateObj)}>
+                          <span className={`font-black text-[22pt] px-2 py-1 rounded-xl transition-all ${isToday ? 'bg-[#beff64]' : isSelected ? 'bg-gray-100/50' : (idx % 7 === 0 || idx % 7 === 6) ? 'text-[#EF4444]' : 'text-gray-600'}`} style={showBorder ? { borderColor: JAPAN_TEAL, borderWidth: '2px', color: JAPAN_TEAL } : {}}>{day}</span>
+                          {hasLog && (
+                            <div className="absolute inset-0 flex items-center justify-center animate-in zoom-in pointer-events-none">
+                              <StatusIndicator size={42} active={true} type="smile" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                  }) : calendarDays.map((data, idx) => {
+                      const log = dailyLogs[data.fullDate];
+                      const hasLog = log && (log.isPracticing || log.isFiveMin || log.isWorkout || log.isStretch);
+                      const isToday = data.fullDate === todayKey;
+                      const isSelected = data.fullDate === getDateKey(selectedDate);
+                      return (
+                        <div key={idx} className="flex flex-col items-center space-y-1 cursor-pointer" onClick={() => setSelectedDate(new Date(data.fullDate))}>
+                           <div className={`w-14 h-14 flex items-center justify-center rounded-2xl border-2 ${isToday ? 'bg-[#beff64]' : isSelected ? 'bg-gray-100/50 border-dashed' : 'border-transparent'}`} style={{ borderColor: (isToday || isSelected) ? JAPAN_TEAL : 'transparent' }}>
+                              {hasLog ? <StatusIndicator size={46} active={true} type="smile" /> : <div className="w-2 h-2 rounded-full bg-gray-100" />}
+                           </div>
+                           <span className={`text-[10px] font-black ${idx === 0 || idx === 6 ? 'text-[#EF4444]' : 'text-gray-400'}`}>
+                             {data.month}/{data.day}
+                           </span>
+                        </div>
+                      );
+                  })}
+                </div>
+             </div>
+          </div>
+        )}
+
+        {activeTab === 'ranking' && (
+          <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black" style={{ color: JAPAN_TEAL }}>自律達人</h2>
+              <div className="text-[10px] font-black opacity-30 tracking-widest" style={{ color: JAPAN_TEAL }}>數據採週統計基準</div>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-2 px-2">
+              <RankingFilterBtn active={rankingType === 'totalMins'} onClick={() => setRankingType('totalMins')} label="自律" />
+              <RankingFilterBtn active={rankingType === 'practiceCount'} onClick={() => setRankingType('practiceCount')} label="練功" />
+              <RankingFilterBtn active={rankingType === 'fiveMinCount'} onClick={() => setRankingType('fiveMinCount')} label="五分鐘" />
+              <RankingFilterBtn active={rankingType === 'workoutMins'} onClick={() => setRankingType('workoutMins')} label="運動" />
+              <RankingFilterBtn active={rankingType === 'stretchMins'} onClick={() => setRankingType('stretchMins')} label="拉筋" />
+            </div>
+
+            <div className="flex items-end justify-center space-x-2 pt-10 px-4">
+              {sortedRankings[1] && (
+                <div className="flex flex-col items-center w-24">
+                  <div className="flex flex-col items-center mb-1">
+                    <span className="text-xl font-black" style={{ color: JAPAN_TEAL }}>{sortedRankings[1][rankingType] || 0}</span>
+                    <span className="text-[10px] font-bold opacity-40 -mt-1">{rankingType.includes('Count') ? '次' : 'min'}</span>
+                  </div>
+                  <div className="bg-[#beff64] w-full rounded-t-xl h-24 flex flex-col items-center justify-center p-2 border-x-2 border-t-2" style={{ borderColor: JAPAN_TEAL }}>
+                    <span className="text-[12px] font-black truncate w-full text-center" style={{ color: JAPAN_TEAL }}>{sortedRankings[1].displayName}</span>
+                  </div>
+                </div>
+              )}
+
+              {sortedRankings[0] && (
+                <div className="flex flex-col items-center w-28">
+                  <div className="flex flex-col items-center mb-1">
+                    <span className="text-3xl font-black" style={{ color: JAPAN_TEAL }}>{sortedRankings[0][rankingType] || 0}</span>
+                    <span className="text-xs font-bold opacity-40 -mt-1">{rankingType.includes('Count') ? '次' : 'min'}</span>
+                  </div>
+                  <div className="bg-[#beff64] w-full rounded-t-xl h-36 flex flex-col items-center justify-center p-2 border-x-2 border-t-2 shadow-sm" style={{ borderColor: JAPAN_TEAL }}>
+                    <span className="text-sm font-black truncate w-full text-center" style={{ color: JAPAN_TEAL }}>{sortedRankings[0].displayName}</span>
+                  </div>
+                </div>
+              )}
+
+              {sortedRankings[2] && (
+                <div className="flex flex-col items-center w-24">
+                  <div className="flex flex-col items-center mb-1">
+                    <span className="text-lg font-black" style={{ color: JAPAN_TEAL }}>{sortedRankings[2][rankingType] || 0}</span>
+                    <span className="text-[10px] font-bold opacity-40 -mt-1">{rankingType.includes('Count') ? '次' : 'min'}</span>
+                  </div>
+                  <div className="bg-[#beff64] w-full rounded-t-xl h-20 flex flex-col items-center justify-center p-2 border-x-2 border-t-2" style={{ borderColor: JAPAN_TEAL }}>
+                    <span className="text-[12px] font-black truncate w-full text-center" style={{ color: JAPAN_TEAL }}>{sortedRankings[2].displayName}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 px-4 pt-4">
+              {sortedRankings.map((u, i) => (
+                <div 
+                  key={u.id} 
+                  className={`border-2 rounded-2xl p-4 flex justify-between items-center transition-all hover:translate-x-1 ${i < 3 ? 'bg-[#beff64]/5' : 'bg-white'}`} 
+                  style={{ 
+                    borderColor: JAPAN_TEAL, 
+                    boxShadow: `4px 4px 0px 0px ${JAPAN_TEAL}`
+                  }}
+                >
+                  <div className="flex items-center space-x-4">
+                    <span className={`font-black w-6 italic ${i < 3 ? 'text-[#33cc99]' : 'text-gray-300'}`}>#{i + 1}</span>
+                    <div className="flex flex-col">
+                      <span className="font-black" style={{ color: JAPAN_TEAL }}>{u.displayName}</span>
+                      {u.id === user?.uid && <span className="text-[8px] font-bold bg-emerald-900 text-white px-1 rounded inline-block w-fit">本人</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-baseline space-x-1">
+                    <span className="font-black text-xl text-[#33cc99]">{u[rankingType] || 0}</span>
+                    <span className="text-[10px] font-bold opacity-30">{rankingType.includes('Count') ? '次' : 'min'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'profile' && user && (
+          <div className="flex flex-col items-center animate-in fade-in duration-500 py-6 space-y-8">
+             <div className="flex flex-col items-center space-y-4">
+               <div className="w-24 h-24 rounded-3xl bg-[#beff64] border-2 flex items-center justify-center shadow-[8px_8px_0px_0px_rgba(6,95,70,1)] overflow-hidden" style={{ borderColor: JAPAN_TEAL }}>
+                  {user.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : <StatusIndicator size={56} active={true} color={BRAND_GREEN} type="smile" />}
+               </div>
+               <div className="text-center space-y-1">
+                  <h2 className="text-2xl font-black" style={{ color: JAPAN_TEAL }}>{user.displayName || `使用者 ${user.uid.slice(0, 5)}`}</h2>
+                  <div className="bg-[#beff64] border-2 px-3 py-1 rounded-full text-xs font-black inline-block mt-1" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}>
+                    本月統計
+                  </div>
+               </div>
+             </div>
+
+             <div className="w-full max-sm px-2">
+                <div className="w-full mb-4">
+                  <ProfileStatCard 
+                     icon={<BarChart3 className="text-emerald-600" size={28} />} 
+                     label="總自律" 
+                     value={monthlyStats.totalMins} 
+                     unit="min" 
+                     highlight={true}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <ProfileStatCard 
+                     icon={<Flame className="text-orange-500" size={24} />} 
+                     label="練功" 
+                     value={monthlyStats.practiceCount} 
+                     unit="次" 
+                  />
+                  <ProfileStatCard 
+                     icon={<Clock className="text-blue-500" size={24} />} 
+                     label="五分鐘" 
+                     value={monthlyStats.fiveMinCount} 
+                     unit="次" 
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <ProfileStatCard 
+                     icon={<Dumbbell className="text-indigo-600" size={24} />} 
+                     label="總運動" 
+                     value={monthlyStats.workoutMins} 
+                     unit="min" 
+                  />
+                  <ProfileStatCard 
+                     icon={<Smile className="text-amber-500" size={24} />} 
+                     label="總拉筋" 
+                     value={monthlyStats.stretchMins} 
+                     unit="min" 
+                  />
+                </div>
+
+                <button 
+                  onClick={handleLogout} 
+                  className="w-full p-6 bg-white border-2 rounded-2xl flex items-center justify-center space-x-3 shadow-[6px_6px_0px_0px_rgba(6,95,70,1)] hover:translate-y-[2px] transition-all mt-8" 
+                  style={{ borderColor: JAPAN_TEAL }}
+                >
+                   <LogOut size={24} style={{ color: JAPAN_TEAL }} />
+                   <span className="font-black text-xl" style={{ color: JAPAN_TEAL }}>登出</span>
+                </button>
+             </div>
+          </div>
+        )}
+      </main>
+
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-md bg-white border-2 rounded-3xl px-6 py-4 flex justify-between items-center z-20" style={{ borderColor: JAPAN_TEAL, boxShadow: `8px 8px 0px 0px ${JAPAN_TEAL}` }}>
+        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} label="首頁" icon={<Smile />} />
+        <NavButton active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} label="日期" icon={<Calendar />} />
+        <NavButton active={activeTab === 'ranking'} onClick={() => setActiveTab('ranking')} label="達人" icon={<Award />} />
+        <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} label="個人" icon={<User />} />
+      </nav>
+
+      {showLogModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] border-2 p-8 animate-in zoom-in-95 overflow-y-auto max-h-[90vh]" style={{ borderColor: JAPAN_TEAL, boxShadow: `12px 12px 0px 0px ${JAPAN_TEAL}` }}>
+             <div className="flex justify-between items-start mb-6">
+                <div className="flex flex-col">
+                  <h3 className="text-xl font-black" style={{ color: JAPAN_TEAL }}>今日打卡</h3>
+                  <span className="text-xs font-bold text-gray-400 mt-1">可重複累計</span>
+                </div>
+                <button onClick={() => setShowLogModal(false)} style={{ color: JAPAN_TEAL }} className="mt-1"><XCircle size={28} /></button>
+             </div>
+             <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setIsPracticing(!isPracticing)} className={`p-4 rounded-xl border-2 font-black flex flex-col items-center transition-all ${isPracticing ? 'bg-[#fef9c3] border-[3px] shadow-[3px_3px_0px_0px_rgba(6,95,70,1)]' : 'border-gray-100'}`} style={isPracticing ? { borderColor: JAPAN_TEAL } : {}}>
+                    <StatusIndicator active={isPracticing} type="smile" /> <span className="mt-1" style={{ color: JAPAN_TEAL }}>練功</span>
+                  </button>
+                  <button onClick={() => setIsFiveMin(!isFiveMin)} className={`p-4 rounded-xl border-2 font-black flex flex-col items-center transition-all ${isFiveMin ? 'bg-[#fef9c3] border-[3px] shadow-[3px_3px_0px_0px_rgba(6,95,70,1)]' : 'border-gray-100'}`} style={isFiveMin ? { borderColor: JAPAN_TEAL } : {}}>
+                    <StatusIndicator active={isFiveMin} type="smile" /> <span className="mt-1" style={{ color: JAPAN_TEAL }}>五分鐘</span>
+                  </button>
+                </div>
+                <div className={`p-5 border-2 rounded-2xl transition-all ${isWorkout ? 'border-[3px] bg-[#fef9c3] shadow-[4px_4px_0px_0px_rgba(6,95,70,1)]' : 'border-gray-100 bg-white opacity-60'}`} style={isWorkout ? { borderColor: JAPAN_TEAL } : {}}>
+                   <div className="flex justify-between items-center">
+                      <label className="font-black flex items-center space-x-3 cursor-pointer" style={{ color: JAPAN_TEAL }}>
+                        <input type="checkbox" checked={isWorkout} onChange={e => setIsWorkout(e.target.checked)} className="w-6 h-6 rounded accent-emerald-900" />
+                        <span className="text-lg">運動</span>
+                      </label>
+                      <select disabled={!isWorkout} value={workoutMins} onChange={e => setWorkoutMins(parseInt(e.target.value))} className="font-black border-2 rounded-lg px-2 py-1 bg-white" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}>
+                        {COMMON_TIME_OPTIONS.map(v => <option key={v} value={v}>{formatTimeLabel(v)}</option>)}
+                      </select>
+                   </div>
+                </div>
+                <div className={`p-5 border-2 rounded-2xl transition-all ${isStretch ? 'border-[3px] bg-[#fef9c3] shadow-[4px_4px_0px_0px_rgba(6,95,70,1)]' : 'border-gray-100 bg-white opacity-60'}`} style={isStretch ? { borderColor: JAPAN_TEAL } : {}}>
+                   <div className="flex justify-between items-center">
+                      <label className="font-black flex items-center space-x-3 cursor-pointer" style={{ color: JAPAN_TEAL }}>
+                        <input type="checkbox" checked={isStretch} onChange={e => setIsStretch(e.target.checked)} className="w-6 h-6 rounded accent-emerald-900" />
+                        <span className="text-lg">拉筋</span>
+                      </label>
+                      <select disabled={!isStretch} value={stretchMins} onChange={e => setStretchMins(parseInt(e.target.value))} className="font-black border-2 rounded-lg px-2 py-1 bg-white" style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL }}>
+                        {COMMON_TIME_OPTIONS.map(v => <option key={v} value={v}>{formatTimeLabel(v)}</option>)}
+                      </select>
+                   </div>
+                </div>
+                <button 
+                  onClick={handleSaveRecord} 
+                  className="w-full bg-[#beff64] border-2 py-5 rounded-2xl font-black text-xl hover:bg-[#a6e050] transition-all" 
+                  style={{ borderColor: JAPAN_TEAL, color: JAPAN_TEAL, boxShadow: `4px 4px 0px 0px ${JAPAN_TEAL}` }}
+                >
+                  打卡
+                </button>
+             </div>
           </div>
         </div>
-      </div>
-      <button id="logBtn" class="w-full p-4 bg-[#beff64] rounded-3xl font-black hard-shadow btn-press mt-4">+ 打卡</button>
+      )}
     </div>
+  );
+};
 
-    <!-- Calendar -->
-    <div id="page-calendar" class="page p-4">
-      <div class="flex justify-between items-center mb-4">
-        <div class="font-bold text-[#065f46]">2026年1月</div>
-        <div class="flex space-x-2">
-          <button class="px-2 py-1 bg-[#FACC15] rounded-2xl text-[#065f46]">今日</button>
-          <button class="px-2 py-1 border-2 border-[#065f46] rounded-2xl text-[#065f46]">週/月切換</button>
-        </div>
-      </div>
-      <div class="grid grid-cols-7 gap-2">
-        <!-- 假設月份 7x5 -->
-        <div class="status-circle bg-[#FACC15]">😄</div>
-        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-        <div class="status-circle bg-[#FACC15]">😄</div>
-        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-        <div class="status-circle bg-[#FACC15]">😄</div>
-        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
-      </div>
-    </div>
+const ProfileStatCard = ({ icon, label, value, unit, highlight = false }) => (
+  <div className={`p-6 bg-white border-2 rounded-2xl flex flex-col items-center justify-center shadow-[6px_6px_0px_0px_rgba(6,95,70,1)] text-center transition-all ${highlight ? 'bg-[#beff64]/10' : ''}`} style={{ borderColor: JAPAN_TEAL }}>
+     <div className="mb-2">{icon}</div>
+     <span className="font-black opacity-60 mb-2" style={{ color: JAPAN_TEAL, fontSize: '18pt' }}>{label}</span>
+     <div className="flex items-baseline space-x-1">
+        <span className="font-black" style={{ color: JAPAN_TEAL, fontSize: '22pt', lineHeight: '1' }}>{value}</span>
+        <span className="text-sm font-bold opacity-30">{unit}</span>
+     </div>
+  </div>
+);
 
-    <!-- Ranking -->
-    <div id="page-ranking" class="page p-4">
-      <div class="flex justify-around mb-4">
-        <div class="w-16 h-24 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
-          <span class="font-bold text-[#065f46]">2</span>
-          <span>小明</span>
-        </div>
-        <div class="w-16 h-32 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
-          <span class="font-bold text-[#065f46]">1</span>
-          <span>小華</span>
-        </div>
-        <div class="w-16 h-20 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
-          <span class="font-bold text-[#065f46]">3</span>
-          <span>小美</span>
-        </div>
-      </div>
-      <div>
-        <div class="flex justify-between p-2 border-b border-gray-300">
-          <span>4</span><span>小李</span><span>80 min</span>
-        </div>
-        <div class="flex justify-between p-2 border-b border-gray-300">
-          <span>5</span><span>小王</span><span>75 min</span>
-        </div>
-      </div>
-    </div>
+const NavButton = ({ active, onClick, icon, label }) => (
+  <button onClick={onClick} className={`flex flex-col items-center space-y-1 flex-1 transition-all ${active ? 'scale-110' : 'opacity-30'}`} style={{ color: JAPAN_TEAL }}>
+    {React.cloneElement(icon, { size: 24, strokeWidth: 3 })}
+    <span className="text-[10px] font-black">{label}</span>
+  </button>
+);
 
-    <!-- Profile -->
-    <div id="page-profile" class="page p-4">
-      <div class="flex flex-col items-center space-y-2 mb-4">
-        <div class="w-20 h-20 bg-[#065f46] rounded-3xl"></div>
-        <div class="font-bold text-[#065f46]">我的名字</div>
-        <div class="text-[#FACC15] font-bold">本月統計</div>
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">練功<br>12次</div>
-        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">五分鐘<br>8次</div>
-        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">運動<br>50 min</div>
-        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">拉筋<br>20 min</div>
-      </div>
-      <button class="w-full p-4 mt-4 bg-[#beff64] rounded-3xl font-black hard-shadow btn-press">登出</button>
-    </div>
+const RankingFilterBtn = ({ active, onClick, label }) => (
+  <button 
+    onClick={onClick} 
+    className={`px-4 py-1.5 rounded-full border-2 font-black text-xs transition-all ${active ? 'bg-emerald-900 text-white shadow-none translate-y-0.5' : 'bg-white text-emerald-900 shadow-[2px_2px_0px_0px_rgba(6,95,70,1)]'}`} 
+    style={{ borderColor: JAPAN_TEAL }}
+  >
+    {label}
+  </button>
+);
 
-  </main>
-
-  <!-- Bottom Nav -->
-  <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-11/12 bg-white border-2 border-[#065f46] rounded-3xl hard-shadow flex justify-around p-2">
-    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="dashboard">
-      <i data-lucide="home"></i>
-    </div>
-    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="calendar">
-      <i data-lucide="calendar"></i>
-    </div>
-    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="ranking">
-      <i data-lucide="award"></i>
-    </div>
-    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="profile">
-      <i data-lucide="user"></i>
-    </div>
-  </nav>
-
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-
-      // SPA 切換
-      const pages = {
-        dashboard: document.getElementById('page-dashboard'),
-        calendar: document.getElementById('page-calendar'),
-        ranking: document.getElementById('page-ranking'),
-        profile: document.getElementById('page-profile')
-      };
-      document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.dataset.target;
-          for (const key in pages) pages[key].classList.remove('active');
-          pages[target].classList.add('active');
-        });
-      });
-
-      // 打卡按鈕
-      document.getElementById("logBtn").addEventListener("click", () => {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#beff64', '#FACC15'] });
-        alert("打卡成功！");
-      });
-    });
-  </script>
-</body>
-</html>
+export default App;
