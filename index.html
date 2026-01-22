@@ -48,7 +48,7 @@
             .card-locked { @apply bg-white opacity-50 pointer-events-none; }
             .clean-select { appearance: none; background-image: none; }
         }
-        body { font-family: 'Noto Sans TC', 'Lato', sans-serif; @apply bg-[#fefce8] text-gray-800; }
+        body { font-family: 'Noto Sans TC', 'Lato', sans-serif; @apply bg-[#fefce8] text-gray-800 antialiased; }
     </style>
 </head>
 <body>
@@ -165,11 +165,12 @@
                     setDailyLogs(logs);
                     
                     if (logs[todayKey]) {
+                        const data = logs[todayKey];
                         setInputState({
-                            practice: Number(logs[todayKey].practice) || 0,
-                            fiveMin: Number(logs[todayKey].fiveMin) || 0,
-                            exerciseTime: Number(logs[todayKey].exerciseTime) || 0,
-                            stretchTime: Number(logs[todayKey].stretchTime) || 0
+                            practice: Number(data.practice) || 0,
+                            fiveMin: Number(data.fiveMin) || 0,
+                            exerciseTime: Number(data.exerciseTime) || 0,
+                            stretchTime: Number(data.stretchTime) || 0
                         });
                     }
                 }, (error) => console.error("Firestore error:", error));
@@ -231,17 +232,29 @@
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
             };
 
+            const handleResetToday = async () => {
+                if (!user) return;
+                const resetData = { practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 };
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).set(resetData);
+                setSessionLocked({ practice: false, fiveMin: false, exercise: false, stretch: false });
+                setInputState(resetData);
+            };
+
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-24 lato-font">
-                    <header className="bg-white/90 backdrop-blur-md sticky top-0 px-4 py-4 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
+                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative flex flex-col lato-font">
+                    {/* 頂部導覽列：高度縮短，文字水平置中 */}
+                    <header className="bg-white/90 backdrop-blur-md sticky top-0 px-4 py-2 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
+                        <div className="w-10"></div> {/* 佔位符以確保中心對齊 */}
                         <div className="flex items-center space-x-2 text-[#065f46]">
-                            <div className="bg-yellow-400 p-1.5 rounded-lg neo-border-thin shadow-sm"><Icon name="Zap" size={20} /></div>
-                            <span className="jp-font text-xl tracking-tight">自律動起來</span>
+                            <div className="bg-yellow-400 p-1 rounded-lg neo-border-thin shadow-sm"><Icon name="Zap" size={16} /></div>
+                            <span className="jp-font text-lg tracking-tight">自律動起來</span>
                         </div>
-                        <div onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-full neo-border bg-yellow-400 flex items-center justify-center cursor-pointer active-press"><Icon name="User" size={20} /></div>
+                        <div onClick={() => setActiveTab('profile')} className="w-9 h-9 rounded-full neo-border bg-yellow-400 flex items-center justify-center cursor-pointer active-press">
+                            <Icon name="User" size={18} />
+                        </div>
                     </header>
 
-                    <main className="p-4">
+                    <main className="flex-1 p-4 pb-32">
                         {activeTab === 'dashboard' && (
                             <div className="space-y-4">
                                 <div className="glass-card p-4 rounded-[1.5rem] neo-border neo-shadow float-anim">
@@ -294,28 +307,46 @@
                             <div className="w-full max-w-sm bg-white rounded-[1.5rem] neo-border neo-shadow p-5 animate-in zoom-in-95 duration-200 relative">
                                 <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={14} /></button>
                                 <h3 className="jp-font text-xl text-[#065f46] text-center mb-6">今日修煉</h3>
+                                
                                 <div className="grid grid-cols-2 gap-3">
                                     <AccumulateCard label="練功" count={inputState.practice} isLocked={sessionLocked.practice} onIncrement={() => handleAccumulate('simple', 'practice')} />
                                     <AccumulateCard label="五分鐘" count={inputState.fiveMin} isLocked={sessionLocked.fiveMin} onIncrement={() => handleAccumulate('simple', 'fiveMin')} />
                                     <TimeAccumulateCard label="運動" totalMins={inputState.exerciseTime} isLocked={sessionLocked.exercise} onIncrement={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
                                     <TimeAccumulateCard label="拉筋" totalMins={inputState.stretchTime} isLocked={sessionLocked.stretch} onIncrement={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
                                 </div>
-                                <div className="mt-6"><button onClick={() => setIsModalOpen(false)} className="w-full py-3 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button></div>
+
+                                <div className="mt-6 flex flex-col gap-2">
+                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-3 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button>
+                                    <button 
+                                        onClick={() => {
+                                            if(window.confirm("確定要清除今天的打卡紀錄嗎？")) {
+                                                handleResetToday();
+                                            }
+                                        }} 
+                                        className="w-full py-2 bg-white text-red-500 rounded-2xl jp-font text-xs active-press flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
+                                    >
+                                        <Icon name="Trash2" size={14} />
+                                        清除今日紀錄
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[280px] bg-white neo-border rounded-full p-1.5 flex justify-around neo-shadow z-20">
-                        <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
-                        <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
-                        <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" />
+                    {/* 底部導覽列：固定在最下方，風格一致 */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#065f46] px-6 py-4 pb-6 z-40">
+                        <div className="max-w-md mx-auto flex justify-between items-center bg-[#fde68a] neo-border rounded-full p-1.5 neo-shadow-sm">
+                            <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" label="主頁" />
+                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" label="日曆" />
+                            <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" label="個人" />
+                        </div>
                     </nav>
                 </div>
             );
         };
 
         const ProfileView = ({ stats, userId }) => (
-            <div className="space-y-4 text-center animate-in fade-in duration-500 lato-font">
+            <div className="space-y-4 text-center animate-in fade-in duration-500">
                 <div className="w-20 h-20 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-2">
                     <Icon name="User" size={48} className="text-[#065f46]" />
                 </div>
@@ -423,7 +454,7 @@
             const weekDays = useMemo(() => getWeekDays(viewDate), [viewDate]);
 
             return (
-                <div className="space-y-4 lato-font">
+                <div className="space-y-4">
                     <div className="flex bg-white rounded-xl neo-border p-1">
                         <button onClick={() => setViewMode('week')} className={`flex-1 py-1.5 rounded-lg jp-font text-sm transition-all ${viewMode === 'week' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>週</button>
                         <button onClick={() => setViewMode('month')} className={`flex-1 py-1.5 rounded-lg jp-font text-sm transition-all ${viewMode === 'month' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>月</button>
@@ -486,8 +517,11 @@
             );
         };
 
-        const NavBtn = ({ active, onClick, icon }) => (
-            <button onClick={onClick} className={`p-3 rounded-full transition-all ${active ? 'bg-yellow-400 neo-border-thin shadow-sm' : 'opacity-20 hover:opacity-40'}`}><Icon name={icon} size={20} className="text-[#065f46]" /></button>
+        const NavBtn = ({ active, onClick, icon, label }) => (
+            <button onClick={onClick} className={`flex flex-col items-center justify-center px-6 py-1.5 rounded-full transition-all gap-0.5 ${active ? 'bg-white neo-border-thin' : 'opacity-40 hover:opacity-70'}`}>
+                <Icon name={icon} size={18} className="text-[#065f46]" />
+                <span className="text-[10px] jp-font text-[#065f46] tracking-tighter">{label}</span>
+            </button>
         );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
