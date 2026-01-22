@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來</title>
+    <title>自律動起來 - 測試版</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -20,23 +20,10 @@
     }
     </script>
 
-    <script>
-        // 隱藏開發環境的警告訊息 (Babel & Tailwind)
-        const originalWarn = console.warn;
-        console.warn = (...args) => {
-            if (args[0] && typeof args[0] === 'string' && (
-                args[0].includes('in-browser Babel transformer') || 
-                args[0].includes('cdn.tailwindcss.com')
-            )) return;
-            originalWarn(...args);
-        };
-    </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; margin: 0; }
         .neo-brutalism { border: 4px solid #065f46; box-shadow: 6px 6px 0px 0px #065f46; }
-        .active-press:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px 0px #065f46; }
     </style>
 </head>
 <body>
@@ -44,7 +31,7 @@
 
     <script type="module">
         import { initializeApp } from "firebase/app";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "firebase/auth";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
@@ -58,118 +45,72 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
+        
+        // 強制要求選擇帳號（避免自動登入失敗）
+        provider.setCustomParameters({ prompt: 'select_account' });
 
-        // 將方法暴露給 window 讓 React 呼叫
-        window.fb = { auth, provider, signInWithRedirect, signOut, onAuthStateChanged };
-
-        // 啟動時自動檢查重新導向的登入結果
-        getRedirectResult(auth).catch((error) => console.error("登入出錯:", error));
+        window.fb = { auth, provider, signInWithPopup, signOut, onAuthStateChanged };
     </script>
 
     <script type="text/babel">
-        const JAPAN_TEAL = "#065f46";
-
-        // 穩定的圖示渲染組件
-        const SafeIcon = ({ name, size = 24, className = "" }) => {
-            const iconRef = React.useRef(null);
-            React.useEffect(() => {
-                if (window.lucide && iconRef.current) {
-                    iconRef.current.innerHTML = "";
-                    const iconKey = name.charAt(0).toLowerCase() + name.slice(1);
-                    const iconData = window.lucide.icons[name] || window.lucide.icons[iconKey];
-                    if (iconData) {
-                        const svg = window.lucide.createElement(iconData);
-                        svg.setAttribute('width', size);
-                        svg.setAttribute('height', size);
-                        svg.setAttribute('stroke', JAPAN_TEAL);
-                        svg.setAttribute('stroke-width', '3');
-                        svg.setAttribute('class', className);
-                        iconRef.current.appendChild(svg);
-                    }
-                }
-            }, [name, size, className]);
-            return <span ref={iconRef} className="inline-flex items-center"></span>;
-        };
-
         function App() {
             const [user, setUser] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
+            const [errorMsg, setErrorMsg] = React.useState("");
 
             React.useEffect(() => {
-                const checkAuth = setInterval(() => {
+                const check = setInterval(() => {
                     if (window.fb?.onAuthStateChanged) {
-                        window.fb.onAuthStateChanged(window.fb.auth, (currentUser) => {
-                            setUser(currentUser);
+                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
+                            setUser(u);
                             setLoading(false);
                         });
-                        clearInterval(checkAuth);
+                        clearInterval(check);
                     }
                 }, 200);
-                return () => clearInterval(checkAuth);
             }, []);
 
-            const handleLogin = () => {
-                window.fb.signInWithRedirect(window.fb.auth, window.fb.provider);
+            const handleLogin = async () => {
+                setErrorMsg("正在喚起 Google 登入...");
+                try {
+                    // 使用 Popup，這對 GitHub Pages 來說通常比較直觀
+                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
+                } catch (error) {
+                    console.error("登入失敗完整資訊:", error);
+                    setErrorMsg("登入出錯: " + error.code);
+                    
+                    if (error.code === "auth/unauthorized-domain") {
+                        alert("錯誤：此網域未被授權！請去 Firebase 控制台加入 osihj.github.io");
+                    } else if (error.code === "auth/popup-blocked") {
+                        alert("錯誤：彈窗被瀏覽器攔截了！請點擊網址列右方的圖示允許彈窗。");
+                    }
+                }
             };
 
-            if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#065f46]">載入中...</div>;
+            if (loading) return <div className="h-screen flex items-center justify-center font-black">載入中...</div>;
 
             if (!user) {
                 return (
-                    <div className="h-screen flex items-center justify-center p-6">
-                        <div className="bg-white p-12 rounded-[3rem] neo-brutalism text-center">
+                    <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
+                        <div className="bg-white p-12 rounded-[3rem] neo-brutalism">
                             <h1 className="text-4xl font-black mb-8 text-[#065f46]">自律動起來</h1>
                             <button 
                                 onClick={handleLogin}
-                                className="bg-[#beff64] border-2 border-[#065f46] px-8 py-4 rounded-2xl font-black text-xl flex items-center space-x-3 neo-brutalism active-press transition-all"
+                                className="bg-[#beff64] border-2 border-[#065f46] px-8 py-4 rounded-2xl font-black text-xl flex items-center space-x-3 active:translate-y-1 transition-all"
                             >
-                                <SafeIcon name="LogIn" />
                                 <span>Google 登入</span>
                             </button>
-                            <p className="mt-6 text-sm text-gray-400 font-bold uppercase">Ready to level up?</p>
+                            {errorMsg && <p className="mt-4 text-red-500 font-bold text-sm">{errorMsg}</p>}
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="max-w-md mx-auto p-4 pt-8 pb-32">
-                    {/* Header */}
-                    <div className="flex justify-between items-center bg-white p-4 rounded-3xl neo-brutalism mb-8">
-                        <div className="flex items-center space-x-3">
-                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" alt="avatar" />
-                            <div>
-                                <p className="text-[10px] text-gray-400 font-black">PLAYER 1</p>
-                                <p className="font-black text-[#065f46]">{user.displayName}</p>
-                            </div>
-                        </div>
-                        <div className="bg-[#beff64] px-4 py-2 rounded-xl border-2 border-[#065f46] flex items-center space-x-1">
-                            <SafeIcon name="Flame" size={18} />
-                            <span className="font-black text-[#065f46]">12</span>
-                        </div>
-                    </div>
-
-                    {/* Main Content */}
-                    <div className="bg-white p-6 rounded-[2.5rem] neo-brutalism mb-8">
-                        <div className="flex justify-between items-center mb-6 px-2">
-                            <SafeIcon name="ChevronLeft" />
-                            <span className="font-black text-xl text-[#065f46]">2026年 1月</span>
-                            <SafeIcon name="ChevronRight" />
-                        </div>
-                        <div className="grid grid-cols-7 gap-2 text-center">
-                            {['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-xs font-black text-gray-300">{d}</div>)}
-                            {Array.from({length: 31}).map((_, i) => (
-                                <div key={i} className="py-2 text-[#065f46] font-black">{i+1}</div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Bottom Navbar */}
-                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-xl">
-                        <button className="p-4 bg-[#beff64] rounded-full border-2 border-[#065f46] active-press"><SafeIcon name="Calendar" /></button>
-                        <button className="p-4 opacity-30"><SafeIcon name="Trophy" /></button>
-                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-30"><SafeIcon name="LogOut" /></button>
-                    </nav>
+                <div className="p-8 text-center">
+                    <h2 className="text-2xl font-black">你好, {user.displayName}！</h2>
+                    <p className="mt-4">登入成功。現在你可以看到運動日曆了。</p>
+                    <button onClick={() => window.fb.signOut(window.fb.auth)} className="mt-8 text-gray-400 underline">登出</button>
                 </div>
             );
         }
