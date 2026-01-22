@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來 - 穩定發佈版</title>
+    <title>自律動起來 - 雲端直接執行版</title>
     
-    <link href="style.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -25,10 +25,9 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        /* 手動加入一些特殊陰影，這樣不用編譯也能有日系風 */
         .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
-        .neo-shadow-sm { box-shadow: 3px 3px 0px 0px #065f46; }
-        .active-press:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px 0px #065f46; }
     </style>
 </head>
 <body class="bg-[#f0fdf4]">
@@ -36,9 +35,10 @@
 
     <script type="module">
         import { initializeApp } from "firebase/app";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "firebase/auth";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "firebase/firestore";
 
+        // 你的 Firebase 設定
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
             authDomain: "actiongame-7c8c9.firebaseapp.com",
@@ -49,131 +49,72 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        window.fb = { 
-            auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(),
-            signInWithPopup, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp, query, orderBy, limit
-        };
+        window.fb = { auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(), signInWithPopup, onAuthStateChanged, collection, doc, setDoc, onSnapshot };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
-        const JAPAN_TEAL = "#065f46";
-        const BRAND_GREEN = "#beff64";
+        const { useState, useEffect } = React;
 
-        // 核心：解決 GitHub 上 Lucide 圖示抓不到的問題
-        const Icon = ({ name, size = 24, className = "" }) => {
-            const iconRef = useRef(null);
+        // 這裡定義一個簡單的圖示組件，解決 CDN 版 Lucide 的渲染問題
+        const Icon = ({ name }) => {
+            const ref = React.useRef(null);
             useEffect(() => {
-                if (window.lucide && iconRef.current) {
-                    iconRef.current.innerHTML = "";
-                    const iconData = window.lucide.icons[name];
-                    if (iconData) {
-                        const svg = window.lucide.createElement(iconData);
-                        svg.setAttribute('width', size);
-                        svg.setAttribute('height', size);
-                        svg.setAttribute('stroke', 'currentColor');
-                        svg.setAttribute('stroke-width', '3');
-                        svg.setAttribute('class', className);
-                        iconRef.current.appendChild(svg);
+                if (window.lucide && ref.current) {
+                    ref.current.innerHTML = '';
+                    const icon = window.lucide.icons[name];
+                    if (icon) {
+                        const element = window.lucide.createElement(icon);
+                        element.setAttribute('stroke-width', '3');
+                        ref.current.appendChild(element);
                     }
                 }
-            }, [name, size, className]);
-            return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
+            }, [name]);
+            return <span ref={ref} className="inline-block w-6 h-6"></span>;
         };
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [dailyLogs, setDailyLogs] = useState({});
-            const [rankings, setRankings] = useState([]);
-            const [showLogModal, setShowLogModal] = useState(false);
 
             useEffect(() => {
-                const checkFB = setInterval(() => {
+                const timer = setInterval(() => {
                     if (window.fb) {
-                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
-                            setUser(u);
-                            if (u) {
-                                // 監聽個人資料與日誌
-                                const logsRef = window.fb.collection(window.fb.db, 'artifacts', 'self-discipline-app', 'users', u.uid, 'logs');
-                                window.fb.onSnapshot(logsRef, (snap) => {
-                                    const data = {};
-                                    snap.forEach(d => data[d.id] = d.data());
-                                    setDailyLogs(data);
-                                });
-                            }
-                        });
-                        clearInterval(checkFB);
+                        window.fb.onAuthStateChanged(window.fb.auth, (u) => setUser(u));
+                        clearInterval(timer);
                     }
                 }, 100);
             }, []);
 
-            const handleLogin = async () => {
-                try { await window.fb.signInWithPopup(window.fb.auth, window.fb.provider); } catch (e) { alert("登入失敗"); }
-            };
-
             if (!user) {
                 return (
-                    <div className="h-screen flex flex-col items-center justify-center p-6 bg-[#beff64]">
-                        <div className="bg-white p-12 rounded-[3rem] border-4 border-[#065f46] neo-shadow mb-8">
-                             <Icon name="Smile" size={80} className="text-[#065f46]" />
+                    <div className="h-screen flex flex-col items-center justify-center bg-[#beff64] p-6">
+                        <div className="bg-white p-10 rounded-[2.5rem] border-4 border-[#065f46] neo-shadow mb-6">
+                            <h1 className="text-3xl font-black text-[#065f46]">自律動起來</h1>
                         </div>
-                        <h1 className="text-4xl font-black text-[#065f46] mb-8">自律動起來</h1>
-                        <button onClick={handleLogin} className="bg-white border-4 border-[#065f46] p-4 rounded-3xl font-black text-[#065f46] neo-shadow-sm active-press flex items-center gap-3">
-                            <Icon name="LogIn" /> 使用 Google 登入
+                        <button 
+                            onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)}
+                            className="bg-white border-4 border-[#065f46] p-4 rounded-2xl font-black neo-shadow active:translate-y-1 active:shadow-none transition-all"
+                        >
+                            Google 登入開始
                         </button>
                     </div>
                 );
             }
 
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#f0fdf4] pb-32">
-                    <header className="p-6 flex justify-between items-center bg-white border-b-4 border-[#065f46] sticky top-0 z-10">
-                        <div className="flex items-center gap-2 text-[#065f46]">
-                            <Icon name="Zap" className="text-yellow-400" />
-                            <h1 className="text-xl font-black">自律動起來</h1>
-                        </div>
-                        <img src={user.photoURL} className="w-10 h-10 rounded-xl border-2 border-[#065f46]" />
+                <div className="p-6">
+                    <header className="flex justify-between items-center mb-10">
+                        <div className="text-2xl font-black text-[#065f46]">你好, {user.displayName}</div>
+                        <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" />
                     </header>
-
-                    <main className="p-6 space-y-6">
-                        {activeTab === 'dashboard' && (
-                            <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-[2rem] border-4 border-[#065f46] neo-shadow">
-                                    <h2 className="text-sm font-black text-gray-400 uppercase">本週累計時間</h2>
-                                    <div className="text-4xl font-black text-[#065f46]">145 <span className="text-lg">min</span></div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-[#beff64] p-5 rounded-[1.5rem] border-4 border-[#065f46] neo-shadow-sm text-[#065f46]">
-                                        <Icon name="Flame" className="mb-2" />
-                                        <div className="font-black">練功 5 次</div>
-                                    </div>
-                                    <div className="bg-white p-5 rounded-[1.5rem] border-4 border-[#065f46] neo-shadow-sm text-[#065f46]">
-                                        <Icon name="Dumbbell" className="mb-2" />
-                                        <div className="font-black">運動 120m</div>
-                                    </div>
-                                </div>
-
-                                <button onClick={() => setShowLogModal(true)} className="w-full bg-[#beff64] p-5 rounded-[2rem] border-4 border-[#065f46] font-black text-[#065f46] neo-shadow active-press flex items-center justify-center gap-2">
-                                    <Icon name="Plus" /> 今日打卡
-                                </button>
-                            </div>
-                        )}
-                        
-                        {/* 日曆與排行榜視圖可以依此類推放入 */}
-                    </main>
-
-                    {/* 底部導覽列 */}
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-2xl z-20">
-                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-full ${activeTab === 'dashboard' ? 'bg-[#beff64]' : ''}`}><Icon name="LayoutGrid" /></button>
-                        <button onClick={() => setActiveTab('calendar')} className={`p-4 rounded-full ${activeTab === 'calendar' ? 'bg-[#beff64]' : ''}`}><Icon name="Calendar" /></button>
-                        <button onClick={() => setActiveTab('ranking')} className={`p-4 rounded-full ${activeTab === 'ranking' ? 'bg-[#beff64]' : ''}`}><Icon name="Trophy" /></button>
-                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-40"><Icon name="LogOut" /></button>
-                    </nav>
+                    <div className="bg-white p-8 rounded-[2rem] border-4 border-[#065f46] neo-shadow">
+                        <div className="text-[#065f46] font-black text-xl flex items-center gap-2">
+                             <Icon name="Zap" /> 歡迎回來！
+                        </div>
+                        <p className="mt-4 text-gray-500 font-bold">今天也準備好要自律了嗎？</p>
+                    </div>
                 </div>
             );
-        }
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
