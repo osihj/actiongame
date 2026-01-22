@@ -1,152 +1,168 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來 - 運動紀錄</title>
-    
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <script type="importmap">
-    {
-      "imports": {
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-      }
-    }
-    </script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; }
-    </style>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2299.6">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
+  </style>
 </head>
 <body>
-    <div id="root"></div>
-
-    <script type="module">
-        import { initializeApp } from "firebase/app";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-        import { getFirestore } from "firebase/firestore";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-            authDomain: "actiongame-7c8c9.firebaseapp.com",
-            projectId: "actiongame-7c8c9",
-            storageBucket: "actiongame-7c8c9.firebasestorage.app",
-            messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-            measurementId: "G-W6CNY1D4RL"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
-
-        // 將實例掛載到 window，讓下方的 Babel Script 可以抓到
-        window.fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged };
-    </script>
-
-    <script type="text/babel">
-        const { Calendar, Trophy, LogOut, ChevronLeft, ChevronRight, LayoutGrid, Rows, Flame, LogIn } = lucide;
-        const JAPAN_TEAL = "#065f46";
-
-        function App() {
-            const [user, setUser] = React.useState(null);
-            const [activeTab, setActiveTab] = React.useState('calendar');
-            const [selectedDate, setSelectedDate] = React.useState(new Date());
-
-            // 監聽 Firebase 登入狀態
-            React.useEffect(() => {
-                if (!window.fb) return;
-                const unsubscribe = window.fb.onAuthStateChanged(window.fb.auth, (currentUser) => {
-                    setUser(currentUser);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const handleLogin = async () => {
-                try {
-                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
-                } catch (error) {
-                    console.error("登入錯誤:", error);
-                    alert("登入失敗，請確認 Firebase 設定中的授權網域是否包含此網址。");
-                }
-            };
-
-            const handleLogout = () => window.fb.signOut(window.fb.auth);
-
-            // 未登入畫面
-            if (!user) {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6">
-                        <div className="bg-white p-10 rounded-[3rem] border-4 text-center shadow-xl border-[#065f46]">
-                            <h1 className="text-4xl font-black mb-6 text-[#065f46]">自律動起來</h1>
-                            <button onClick={handleLogin} className="flex items-center space-x-3 bg-[#beff64] border-2 px-8 py-4 rounded-2xl font-black text-xl border-[#065f46] text-[#065f46] active:scale-95 transition-all">
-                                <LogIn size="24" />
-                                <span>Google 登入</span>
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
-
-            // 已登入主畫面
-            return (
-                <div className="max-w-md mx-auto min-h-screen pb-32 pt-6 px-4">
-                    <div className="flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] border-2 border-[#065f46]">
-                        <div className="flex items-center space-x-3">
-                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" />
-                            <div>
-                                <div className="text-[10px] text-gray-500 font-bold uppercase">MEMBER</div>
-                                <div className="font-black text-[#065f46]">{user.displayName}</div>
-                            </div>
-                        </div>
-                        <div className="bg-[#beff64] px-3 py-1.5 rounded-xl border-2 border-[#065f46] flex items-center space-x-1">
-                            <Flame size="16" fill="#065f46" />
-                            <span className="font-black text-sm text-[#065f46]">12 Day</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-[2rem] p-6 border-2 border-[#065f46] shadow-[8px_8px_0px_0px_#065f46]">
-                        <div className="flex justify-between items-center mb-6">
-                            <button onClick={() => {
-                                const d = new Date(selectedDate);
-                                d.setMonth(d.getMonth() - 1);
-                                setSelectedDate(d);
-                            }}><ChevronLeft size="24" /></button>
-                            <span className="font-black text-[#065f46]">{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月</span>
-                            <button onClick={() => {
-                                const d = new Date(selectedDate);
-                                d.setMonth(d.getMonth() + 1);
-                                setSelectedDate(d);
-                            }}><ChevronRight size="24" /></button>
-                        </div>
-                        <div className="grid grid-cols-7 text-center font-black text-gray-300">
-                            {['日','一','二','三','四','五','六'].map(d => <div key={d} className="mb-2">{d}</div>)}
-                            {Array.from({length: 30}, (_, i) => i + 1).map(day => (
-                                <div key={day} className="h-10 flex items-center justify-center text-gray-600">{day}</div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <nav className="fixed bottom-6 left-6 right-6 max-w-md mx-auto bg-white border-4 border-[#065f46] rounded-[2.5rem] p-2 flex justify-around shadow-2xl z-50">
-                        <button className="p-4" style={{ color: JAPAN_TEAL }}><Calendar size="24" /></button>
-                        <button className="p-4 opacity-30"><Trophy size="24" /></button>
-                        <button onClick={handleLogout} className="p-4 opacity-30"><LogOut size="24" /></button>
-                    </nav>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+<p class="p1">&lt;!DOCTYPE html&gt;</p>
+<p class="p1">&lt;html lang="zh-TW"&gt;</p>
+<p class="p1">&lt;head&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;title&gt;自律動起來 - 運動紀錄&lt;/title&gt;</p>
+<p class="p2"><span class="Apple-converted-space">    </span></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://unpkg.com/react@18/umd/react.development.js"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://unpkg.com/@babel/standalone/babel.min.js"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://unpkg.com/lucide@latest"&gt;&lt;/script&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script type="importmap"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>{</p>
+<p class="p1"><span class="Apple-converted-space">      </span>"imports": {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>"firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",</p>
+<p class="p1"><span class="Apple-converted-space">        </span>"firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",</p>
+<p class="p1"><span class="Apple-converted-space">        </span>"firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;style&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&amp;display=swap');</p>
+<p class="p1"><span class="Apple-converted-space">        </span>body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</p>
+<p class="p1">&lt;/head&gt;</p>
+<p class="p1">&lt;body&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div id="root"&gt;&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script type="module"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { initializeApp } from "firebase/app";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { getFirestore } from "firebase/firestore";</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const firebaseConfig = {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>authDomain: "actiongame-7c8c9.firebaseapp.com",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>projectId: "actiongame-7c8c9",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>storageBucket: "actiongame-7c8c9.firebasestorage.app",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>messagingSenderId: "386021872588",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>appId: "1:386021872588:web:eb6019fa0a182d3aec4369",</p>
+<p class="p1"><span class="Apple-converted-space">            </span>measurementId: "G-W6CNY1D4RL"</p>
+<p class="p1"><span class="Apple-converted-space">        </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const app = initializeApp(firebaseConfig);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const auth = getAuth(app);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const db = getFirestore(app);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const provider = new GoogleAuthProvider();</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// 將實例掛載到 window，讓下方的 Babel Script 可以抓到</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged };</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script type="text/babel"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const { Calendar, Trophy, LogOut, ChevronLeft, ChevronRight, LayoutGrid, Rows, Flame, LogIn } = lucide;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const JAPAN_TEAL = "#065f46";</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>function App() {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const [user, setUser] = React.useState(null);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const [activeTab, setActiveTab] = React.useState('calendar');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const [selectedDate, setSelectedDate] = React.useState(new Date());</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// 監聽 Firebase 登入狀態</p>
+<p class="p1"><span class="Apple-converted-space">            </span>React.useEffect(() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (!window.fb) return;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const unsubscribe = window.fb.onAuthStateChanged(window.fb.auth, (currentUser) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>setUser(currentUser);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return () =&gt; unsubscribe();</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}, []);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const handleLogin = async () =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>} catch (error) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>console.error("登入錯誤:", error);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>alert("登入失敗，請確認 Firebase 設定中的授權網域是否包含此網址。");</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const handleLogout = () =&gt; window.fb.signOut(window.fb.auth);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// 未登入畫面</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!user) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return (</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div className="flex flex-col items-center justify-center min-h-screen p-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div className="bg-white p-10 rounded-[3rem] border-4 text-center shadow-xl border-[#065f46]"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;h1 className="text-4xl font-black mb-6 text-[#065f46]"&gt;自律動起來&lt;/h1&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;button onClick={handleLogin} className="flex items-center space-x-3 bg-[#beff64] border-2 px-8 py-4 rounded-2xl font-black text-xl border-[#065f46] text-[#065f46] active:scale-95 transition-all"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;LogIn size="24" /&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;span&gt;Google 登入&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// 已登入主畫面</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return (</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div className="max-w-md mx-auto min-h-screen pb-32 pt-6 px-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div className="flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] border-2 border-[#065f46]"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div className="flex items-center space-x-3"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" /&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;div className="text-[10px] text-gray-500 font-bold uppercase"&gt;MEMBER&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;div className="font-black text-[#065f46]"&gt;{user.displayName}&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div className="bg-[#beff64] px-3 py-1.5 rounded-xl border-2 border-[#065f46] flex items-center space-x-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;Flame size="16" fill="#065f46" /&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;span className="font-black text-sm text-[#065f46]"&gt;12 Day&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div className="bg-white rounded-[2rem] p-6 border-2 border-[#065f46] shadow-[8px_8px_0px_0px_#065f46]"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div className="flex justify-between items-center mb-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;button onClick={() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>const d = new Date(selectedDate);</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>d.setMonth(d.getMonth() - 1);</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>setSelectedDate(d);</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>}}&gt;&lt;ChevronLeft size="24" /&gt;&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;span className="font-black text-[#065f46]"&gt;{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;button onClick={() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>const d = new Date(selectedDate);</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>d.setMonth(d.getMonth() + 1);</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>setSelectedDate(d);</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>}}&gt;&lt;ChevronRight size="24" /&gt;&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div className="grid grid-cols-7 text-center font-black text-gray-300"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>{['日','一','二','三','四','五','六'].map(d =&gt; &lt;div key={d} className="mb-2"&gt;{d}&lt;/div&gt;)}</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>{Array.from({length: 30}, (_, i) =&gt; i + 1).map(day =&gt; (</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;div key={day} className="h-10 flex items-center justify-center text-gray-600"&gt;{day}&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>))}</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;nav className="fixed bottom-6 left-6 right-6 max-w-md mx-auto bg-white border-4 border-[#065f46] rounded-[2.5rem] p-2 flex justify-around shadow-2xl z-50"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;button className="p-4" style={{ color: JAPAN_TEAL }}&gt;&lt;Calendar size="24" /&gt;&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;button className="p-4 opacity-30"&gt;&lt;Trophy size="24" /&gt;&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;button onClick={handleLogout} className="p-4 opacity-30"&gt;&lt;LogOut size="24" /&gt;&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/nav&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>const root = ReactDOM.createRoot(document.getElementById('root'));</p>
+<p class="p1"><span class="Apple-converted-space">        </span>root.render(&lt;App /&gt;);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
+<p class="p1">&lt;/body&gt;</p>
+<p class="p1">&lt;/html&gt;</p>
 </body>
 </html>
