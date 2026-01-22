@@ -3,13 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來 - 測試版</title>
+    <title>自律動起來</title>
     
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        :root {
+            --primary: #beff64;
+            --dark: #065f46;
+            --bg: #f0fdf4;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: var(--dark);
+        }
+
+        .card {
+            background: white;
+            padding: 3rem;
+            border-radius: 2.5rem;
+            border: 4px solid var(--dark);
+            box-shadow: 6px 6px 0px 0px var(--dark);
+            text-align: center;
+            max-width: 320px;
+            width: 90%;
+        }
+
+        h1 { font-weight: 900; font-size: 2rem; margin-bottom: 2rem; }
+
+        .btn-login {
+            background-color: var(--primary);
+            border: 2px solid var(--dark);
+            padding: 1rem 2rem;
+            border-radius: 1rem;
+            font-weight: 900;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-login:active {
+            transform: translate(3px, 3px);
+            box-shadow: none;
+        }
+
+        #user-info { display: none; flex-direction: column; align-items: center; }
+        .avatar { width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--dark); margin-bottom: 1rem; }
+        .hidden { display: none !important; }
+    </style>
 
     <script type="importmap">
     {
@@ -19,15 +74,23 @@
       }
     }
     </script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; margin: 0; }
-        .neo-brutalism { border: 4px solid #065f46; box-shadow: 6px 6px 0px 0px #065f46; }
-    </style>
 </head>
 <body>
-    <div id="root"></div>
+
+    <div id="login-card" class="card">
+        <h1>自律動起來</h1>
+        <button id="login-btn" class="btn-login">
+            <i data-lucide="log-in"></i>
+            <span>Google 登入</span>
+        </button>
+        <p id="status-text" style="margin-top: 1rem; font-size: 0.8rem; font-weight: bold;"></p>
+    </div>
+
+    <div id="user-info" class="card hidden">
+        <img id="user-photo" class="avatar" src="" alt="User">
+        <h2 id="user-name" style="font-weight: 900; margin-bottom: 1rem;"></h2>
+        <button id="logout-btn" style="background: none; border: none; text-decoration: underline; color: gray; cursor: pointer;">登出</button>
+    </div>
 
     <script type="module">
         import { initializeApp } from "firebase/app";
@@ -45,78 +108,18 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
-        
-        // 強制要求選擇帳號（避免自動登入失敗）
-        provider.setCustomParameters({ prompt: 'select_account' });
 
-        window.fb = { auth, provider, signInWithPopup, signOut, onAuthStateChanged };
-    </script>
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loginCard = document.getElementById('login-card');
+        const userInfo = document.getElementById('user-info');
+        const statusText = document.getElementById('status-text');
 
-    <script type="text/babel">
-        function App() {
-            const [user, setUser] = React.useState(null);
-            const [loading, setLoading] = React.useState(true);
-            const [errorMsg, setErrorMsg] = React.useState("");
-
-            React.useEffect(() => {
-                const check = setInterval(() => {
-                    if (window.fb?.onAuthStateChanged) {
-                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
-                            setUser(u);
-                            setLoading(false);
-                        });
-                        clearInterval(check);
-                    }
-                }, 200);
-            }, []);
-
-            const handleLogin = async () => {
-                setErrorMsg("正在喚起 Google 登入...");
-                try {
-                    // 使用 Popup，這對 GitHub Pages 來說通常比較直觀
-                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
-                } catch (error) {
-                    console.error("登入失敗完整資訊:", error);
-                    setErrorMsg("登入出錯: " + error.code);
-                    
-                    if (error.code === "auth/unauthorized-domain") {
-                        alert("錯誤：此網域未被授權！請去 Firebase 控制台加入 osihj.github.io");
-                    } else if (error.code === "auth/popup-blocked") {
-                        alert("錯誤：彈窗被瀏覽器攔截了！請點擊網址列右方的圖示允許彈窗。");
-                    }
-                }
-            };
-
-            if (loading) return <div className="h-screen flex items-center justify-center font-black">載入中...</div>;
-
-            if (!user) {
-                return (
-                    <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
-                        <div className="bg-white p-12 rounded-[3rem] neo-brutalism">
-                            <h1 className="text-4xl font-black mb-8 text-[#065f46]">自律動起來</h1>
-                            <button 
-                                onClick={handleLogin}
-                                className="bg-[#beff64] border-2 border-[#065f46] px-8 py-4 rounded-2xl font-black text-xl flex items-center space-x-3 active:translate-y-1 transition-all"
-                            >
-                                <span>Google 登入</span>
-                            </button>
-                            {errorMsg && <p className="mt-4 text-red-500 font-bold text-sm">{errorMsg}</p>}
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className="p-8 text-center">
-                    <h2 className="text-2xl font-black">你好, {user.displayName}！</h2>
-                    <p className="mt-4">登入成功。現在你可以看到運動日曆了。</p>
-                    <button onClick={() => window.fb.signOut(window.fb.auth)} className="mt-8 text-gray-400 underline">登出</button>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        // 登入功能
+        loginBtn.onclick = async () => {
+            statusText.innerText = "正在開啟登入視窗...";
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("登入錯誤:", error);
+                statusText.style.color = "
