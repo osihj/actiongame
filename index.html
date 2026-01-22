@@ -21,10 +21,10 @@
     </script>
 
     <script>
-        // 🚀 核心：隱藏 Babel 和 Tailwind 的開發警告
+        // 隱藏 Tailwind 與 Babel 的開發警告，讓 Console 保持乾淨
         const originalWarn = console.warn;
         console.warn = (...args) => {
-            if (args[0] && (
+            if (args[0] && (typeof args[0] === 'string') && (
                 args[0].includes('in-browser Babel transformer') || 
                 args[0].includes('cdn.tailwindcss.com')
             )) return;
@@ -95,9 +95,10 @@
                         clearInterval(interval);
                     }
                 }, 200);
+                return () => clearInterval(interval);
             }, []);
 
-            if (loading) return <div className="h-screen flex items-center justify-center font-black">載入中...</div>;
+            if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#065f46]">載入中...</div>;
 
             if (!user) {
                 return (
@@ -117,19 +118,22 @@
             }
 
             return (
-                <div className="max-w-md mx-auto p-4 pt-8">
+                <div className="max-w-md mx-auto p-4 pt-8 pb-24">
                     <div className="flex justify-between items-center bg-white p-4 rounded-3xl neo-brutalism mb-6">
                         <div className="flex items-center space-x-3">
                             <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-[#065f46]" />
                             <span className="font-black text-[#065f46]">{user.displayName}</span>
                         </div>
-                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="opacity-30"><SafeIcon name="LogOut" size={20}/></button>
+                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="opacity-30 p-2"><SafeIcon name="LogOut" size={20}/></button>
                     </div>
                     
-                    <div className="bg-white p-6 rounded-[2rem] neo-brutalism">
-                        <p className="font-black text-[#065f46] mb-4">今日運動進度</p>
+                    <div className="bg-white p-6 rounded-[2rem] neo-brutalism mb-6">
+                        <p className="font-black text-[#065f46] mb-4 flex items-center">
+                            <SafeIcon name="Flame" size={20} className="mr-2" /> 
+                            今日運動進度
+                        </p>
                         <div className="h-4 w-full bg-gray-100 rounded-full border-2 border-[#065f46] overflow-hidden">
-                            <div className="h-full bg-[#beff64]" style={{width: '60%'}}></div>
+                            <div className="h-full bg-[#beff64]" style={{width: '45%'}}></div>
                         </div>
                     </div>
 
