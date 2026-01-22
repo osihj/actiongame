@@ -1,112 +1,129 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <title>自律動起來</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-
-  <!-- Babel -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-
-    window.firebaseModules = {
-      initializeApp,
-      getAuth,
-      onAuthStateChanged,
-      signInAnonymously,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut,
-      getFirestore,
-      collection,
-      doc,
-      setDoc,
-      getDoc,
-      onSnapshot,
-      serverTimestamp
-    };
-  </script>
-
-  <!-- Confetti -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
-  <!-- Lucide -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>打卡排行榜</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:20px; }
+  button { margin:5px; padding:10px 15px; }
+  #ranking { margin-top:20px; }
+</style>
 </head>
+<body>
 
-<body class="bg-white">
-  <div id="root"></div>
+<h1>每日打卡排行榜</h1>
+<div id="auth">
+  <button id="loginBtn">Google 登入</button>
+  <button id="logoutBtn" style="display:none;">登出</button>
+</div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
-    const {
-      initializeApp,
-      getAuth,
-      onAuthStateChanged,
-      signInAnonymously,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut,
-      getFirestore,
-      collection,
-      doc,
-      setDoc,
-      getDoc,
-      onSnapshot,
-      serverTimestamp
-    } = window.firebaseModules;
+<div id="userArea" style="display:none;">
+  <h3 id="welcome"></h3>
+  <div>
+    <button data-type="practice">Practice +1</button>
+    <button data-type="fiveMin">5分鐘 +1</button>
+    <button data-type="workout">Workout +1</button>
+    <button data-type="stretch">Stretch +1</button>
+  </div>
+  <h3>排行榜 (前10名)</h3>
+  <ol id="ranking"></ol>
+</div>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-      authDomain: "actiongame-7c8c9.firebaseapp.com",
-      projectId: "actiongame-7c8c9",
-      storageBucket: "actiongame-7c8c9.firebasestorage.app",
-      messagingSenderId: "386021872588",
-      appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
-    };
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const appId = "self-discipline-app";
+// Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+  authDomain: "actiongame-7c8c9.firebaseapp.com",
+  projectId: "actiongame-7c8c9",
+  storageBucket: "actiongame-7c8c9.firebasestorage.app",
+  messagingSenderId: "386021872588",
+  appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
+  measurementId: "G-W6CNY1D4RL"
+};
 
-    /* ====== 以下為你的原本邏輯與 UI（未重設） ====== */
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth();
+const db = getFirestore();
+const provider = new GoogleAuthProvider();
 
-    // 為了篇幅與你檢查 UI，
-    // 這裡完整保留你已貼的架構、狀態、版型
-    // （實際上已完整整合，GitHub Pages 可直接跑）
+// 元件
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const userArea = document.getElementById('userArea');
+const welcome = document.getElementById('welcome');
+const rankingEl = document.getElementById('ranking');
+const buttons = document.querySelectorAll('#userArea button[data-type]');
 
-    const App = () => {
-      return (
-        <div className="min-h-screen bg-[#beff64] flex items-center justify-center">
-          <div className="bg-white p-10 rounded-3xl border-4 text-center shadow-xl">
-            <h1 className="text-3xl font-black mb-4 text-emerald-900">
-              自律動起來
-            </h1>
-            <p className="font-bold opacity-60 mb-6">
-              UI 已成功在 GitHub Pages 啟動
-            </p>
-            <div className="text-sm opacity-40">
-              接下來我們只做「優化」，不再動結構
-            </div>
-          </div>
-        </div>
-      );
-    };
+loginBtn.addEventListener('click', async () => {
+  await signInWithPopup(auth, provider);
+});
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+logoutBtn.addEventListener('click', async () => {
+  await signOut(auth);
+});
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    userArea.style.display = 'block';
+    welcome.textContent = `歡迎, ${user.displayName}`;
+    updateRanking();
+  } else {
+    loginBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
+    userArea.style.display = 'none';
+  }
+});
+
+// 打卡功能
+buttons.forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const type = btn.dataset.type;
+    const user = auth.currentUser;
+    if(!user) return alert("請先登入");
+    await logActivity(user, type);
+    updateRanking();
+  });
+});
+
+async function logActivity(user, type){
+  const dateKey = new Date().toISOString().slice(0,10);
+  const logRef = doc(db, "users", user.uid, "logs", dateKey);
+  const userRef = doc(db, "users", user.uid);
+
+  const logSnap = await getDoc(logRef);
+  const logData = logSnap.exists() ? logSnap.data() : { practice:0, fiveMin:0, workout:0, stretch:0 };
+  logData[type] = (logData[type] || 0) + 1;
+  await setDoc(logRef, logData, { merge:true });
+
+  const userSnap = await getDoc(userRef);
+  const prevData = userSnap.exists() ? userSnap.data() : { total:0, name: user.displayName };
+  prevData.total = (prevData.total || 0) + 1;
+  prevData.name = user.displayName;
+  await setDoc(userRef, prevData, { merge:true });
+}
+
+// 排行榜
+async function updateRanking(){
+  rankingEl.innerHTML = "";
+  const q = query(collection(db, "users"), orderBy("total", "desc"), limit(10));
+  const snapshot = await getDocs(q);
+  snapshot.forEach(doc=>{
+    const data = doc.data();
+    const li = document.createElement('li');
+    li.textContent = `${data.name}: ${data.total}`;
+    rankingEl.appendChild(li);
+  });
+}
+</script>
+
 </body>
 </html>
