@@ -12,13 +12,13 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDKs (Using 10.x for better stability in browser environments) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style type="text/tailwindcss">
-        @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Lato:wght@400&family=Noto+Sans+TC:wght@400;700;900&display=swap');
         
         @layer utilities {
             .neo-border { @apply border-2 border-[#065f46]; }
@@ -28,6 +28,7 @@
             .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
             .overlay-blur { backdrop-filter: blur(4px); background-color: rgba(6, 95, 70, 0.4); }
             .jp-font { font-family: 'Dela Gothic One', cursive; font-weight: 900; }
+            .lato-font { font-family: 'Lato', sans-serif; font-weight: 400; }
             
             .float-anim { animation: float 4s ease-in-out infinite; }
             @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -44,9 +45,10 @@
             
             .card-bg-warm { background-color: #fffbeb; }
             .card-bg-active { background-color: #fde68a; }
+            .card-locked { @apply bg-white opacity-50 pointer-events-none; }
             .clean-select { appearance: none; background-image: none; }
         }
-        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#fefce8] text-gray-800; }
+        body { font-family: 'Noto Sans TC', 'Lato', sans-serif; @apply bg-[#fefce8] text-gray-800; }
     </style>
 </head>
 <body>
@@ -55,19 +57,50 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- Firebase 配置 ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        firebase.initializeApp(firebaseConfig);
+        // Firebase Configuration From User Input
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+            authDomain: "actiongame-7c8c9.firebaseapp.com",
+            projectId: "actiongame-7c8c9",
+            storageBucket: "actiongame-7c8c9.firebasestorage.app",
+            messagingSenderId: "386021872588",
+            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
+            measurementId: "G-W6CNY1D4RL"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'discipline-app';
+        // Set a constant appId for collection pathing
+        const appId = "discipline-app-v1";
 
-        // --- 工具函數 ---
         const formatDateKey = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
             const d = String(date.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
+        };
+
+        const getWeekDays = (baseDate = new Date()) => {
+            const start = new Date(baseDate);
+            const day = start.getDay(); 
+            const diff = start.getDate() - day; 
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            return Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(start);
+                d.setDate(start.getDate() + i);
+                return d;
+            });
+        };
+
+        const getWeekOfMonth = (date) => {
+            const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+            const offset = firstDayOfMonth.getDay(); 
+            return Math.ceil((date.getDate() + offset) / 7);
         };
 
         const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
@@ -88,54 +121,46 @@
             return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
         };
 
-        const CustomSmile = ({ size = 20, active = false, count = 0, label = "", offset = false }) => (
+        const CustomSmile = ({ size = 20, active = false, count = 0, label = "", offset = false, fontSize = "10px", hasBg = false }) => (
             <div className="flex flex-col items-center">
                 <div 
-                    className={`rounded-full flex items-center justify-center transition-all ${active ? 'bg-yellow-400 neo-border-thin shadow-sm' : 'bg-transparent opacity-10'} ${offset ? 'mt-[1pt]' : ''}`} 
-                    style={{ width: size + 16, height: size + 16 }}
+                    className={`rounded-full flex items-center justify-center transition-all ${active && (hasBg || count > 0) ? 'bg-yellow-400 neo-border-thin shadow-sm' : 'bg-transparent opacity-10'} ${offset ? 'mt-[1pt]' : ''}`} 
+                    style={{ width: size + 8, height: size + 8 }}
                 >
                     <Icon name="Smile" size={size} className="text-[#065f46]" strokeWidth={2.5} />
                 </div>
                 {active && count > 0 && (
-                    <span className="text-[10px] font-black text-[#065f46] leading-none mt-1">
+                    <span className="font-black text-[#065f46] leading-none mt-1 lato-font" style={{ fontSize: fontSize }}>
                         {label || `x${count}`}
                     </span>
                 )}
             </div>
         );
 
-        // --- 主程式 ---
         const App = () => {
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [dailyLogs, setDailyLogs] = useState({}); 
             
-            // 用於追蹤「本次視窗開啟期間」已經點擊過的項目（防止單頁重複打卡）
-            const [sessionClicked, setSessionClicked] = useState({
-                practice: false,
-                fiveMin: false,
-                exercise: false,
-                stretch: false
+            const [sessionLocked, setSessionLocked] = useState({
+                practice: false, fiveMin: false, exercise: false, stretch: false
             });
             
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
+            const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
             
             const [inputState, setInputState] = useState({
-                practice: 0,
-                fiveMin: 0,
-                exerciseTime: 0,
-                stretchTime: 0,
-                exerciseCount: 0,
-                stretchCount: 0
+                practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0
             });
 
             useEffect(() => {
+                // Initial Authentication: Try Anonymous Sign-in for immediate use
                 const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await auth.signInWithCustomToken(__initial_auth_token);
-                    } else {
+                    try {
                         await auth.signInAnonymously();
+                    } catch (e) {
+                        console.error("Auth error:", e);
                     }
                 };
                 initAuth();
@@ -145,6 +170,7 @@
 
             useEffect(() => {
                 if (!user) return;
+                // Follow storage rules: /artifacts/{appId}/users/{userId}/dailyLogs
                 const logsCol = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs');
                 
                 const unsubscribe = logsCol.onSnapshot((snapshot) => {
@@ -157,30 +183,35 @@
                             practice: Number(logs[todayKey].practice) || 0,
                             fiveMin: Number(logs[todayKey].fiveMin) || 0,
                             exerciseTime: Number(logs[todayKey].exerciseTime) || 0,
-                            stretchTime: Number(logs[todayKey].stretchTime) || 0,
-                            exerciseCount: Number(logs[todayKey].exerciseCount) || 0,
-                            stretchCount: Number(logs[todayKey].stretchCount) || 0
+                            stretchTime: Number(logs[todayKey].stretchTime) || 0
                         });
                     } else {
-                        // 如果今天沒資料，重設 local state
-                        setInputState({ practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0, exerciseCount: 0, stretchCount: 0 });
+                        setInputState({ practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 });
                     }
-                });
+                }, (error) => console.error("Firestore error:", error));
                 return () => unsubscribe();
             }, [user, todayKey]);
 
             const stats = useMemo(() => {
                 const now = new Date();
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
-                startOfWeek.setHours(0,0,0,0);
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const weekStart = currentWeekDays[0];
+                const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-                let weekPractice = 0;
-                let weekFiveMin = 0;
+                let weekPracticeTotal = 0;
+                let weekFiveMinTotal = 0;
                 let weekExerciseMins = 0;
-                let weekTotalActions = 0; 
-                let monthTotalDays = 0;
+                let weekActiveDays = 0;
+
+                let monthActiveDays = 0;
+                let monthPracticeTotal = 0;
+                let monthFiveMinTotal = 0;
+                let monthWorkoutMins = 0;
+                let monthStretchMins = 0;
+                
+                let threeWeekActiveDays = 0;
+                const threeWeeksAgo = new Date();
+                threeWeeksAgo.setDate(now.getDate() - 21);
 
                 Object.entries(dailyLogs).forEach(([dateStr, data]) => {
                     const date = new Date(dateStr);
@@ -188,73 +219,78 @@
                     const f = Number(data.fiveMin) || 0;
                     const eT = Number(data.exerciseTime) || 0;
                     const sT = Number(data.stretchTime) || 0;
-                    const eC = Number(data.exerciseCount) || 0;
-                    const sC = Number(data.stretchCount) || 0;
+                    const isAnyActive = (p > 0 || f > 0 || eT > 0 || sT > 0);
 
-                    if (date >= startOfWeek) {
-                        weekPractice += p;
-                        weekFiveMin += f;
+                    if (date >= weekStart) {
+                        weekPracticeTotal += p;
+                        weekFiveMinTotal += f;
                         weekExerciseMins += (eT + sT);
-                        weekTotalActions += (p + f + eC + sC);
+                        if (isAnyActive) weekActiveDays++;
                     }
-                    if (date >= startOfMonth && (p > 0 || f > 0 || eT > 0 || sT > 0)) {
-                        monthTotalDays++;
+                    
+                    if (date >= threeWeeksAgo && isAnyActive) {
+                        threeWeekActiveDays++;
+                    }
+                    
+                    if (dateStr.startsWith(monthPrefix)) {
+                        if (isAnyActive) monthActiveDays++;
+                        monthPracticeTotal += p;
+                        monthFiveMinTotal += f;
+                        monthWorkoutMins += eT;
+                        monthStretchMins += sT;
                     }
                 });
-                return { weekPractice, weekFiveMin, weekExerciseMins, weekTotalActions, monthTotalDays };
-            }, [dailyLogs]);
+
+                const totalMins = monthWorkoutMins + monthStretchMins;
+                const hours = Math.floor(totalMins / 60);
+                const mins = totalMins % 60;
+
+                let statusLabel = "加油！動起來";
+                if (monthActiveDays >= daysInMonth) statusLabel = "自律仙人";
+                else if (threeWeekActiveDays > 15) statusLabel = "自律達人";
+                else if (weekActiveDays === 7) statusLabel = "自律俠客";
+                else if (weekActiveDays >= 3) statusLabel = "穩定進步中";
+
+                return { 
+                    weekActiveDays, weekPracticeTotal, weekFiveMinTotal, weekExerciseMins,
+                    monthActiveDays, monthPracticeTotal, monthFiveMinTotal, monthWorkoutMins, monthStretchMins,
+                    monthHours: hours, monthMins: mins, statusLabel
+                };
+            }, [dailyLogs, currentWeekDays]);
 
             const handleAccumulate = async (type, payload) => {
                 if (!user) return;
-                
-                // 檢查本次視窗是否已點過
                 const sessionKey = type === 'simple' ? payload : (payload.key === 'exerciseTime' ? 'exercise' : 'stretch');
-                if (sessionClicked[sessionKey]) return;
+                if (sessionLocked[sessionKey]) return;
 
                 let updates = {};
                 if (type === 'simple') {
                     updates[payload] = (inputState[payload] || 0) + 1;
                 } else if (type === 'time') {
                     const { key, mins } = payload;
-                    const countKey = key.replace('Time', 'Count');
                     updates[key] = (inputState[key] || 0) + Number(mins);
-                    updates[countKey] = (inputState[countKey] || 0) + 1;
                 }
 
-                setSessionClicked(prev => ({ ...prev, [sessionKey]: true }));
+                setSessionLocked(prev => ({ ...prev, [sessionKey]: true }));
+                window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#065f46', '#fde68a', '#ffffff'] });
 
-                window.confetti({ 
-                    particleCount: 100, 
-                    spread: 70, 
-                    origin: { y: 0.6 }, 
-                    colors: ['#065f46', '#fde68a', '#ffffff'] 
-                });
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
+            };
 
-                await db.collection('artifacts').doc(appId)
-                    .collection('users').doc(user.uid)
-                    .collection('dailyLogs').doc(todayKey)
-                    .set(updates, { merge: true });
+            const openModal = () => {
+                setSessionLocked({ practice: false, fiveMin: false, exercise: false, stretch: false });
+                setIsModalOpen(true);
             };
 
             const handleResetToday = async () => {
                 if (!user) return;
-                const confirmReset = window.confirm("確定要清空今天的打卡紀錄並重新計算嗎？");
-                if (confirmReset) {
-                    await db.collection('artifacts').doc(appId)
-                        .collection('users').doc(user.uid)
-                        .collection('dailyLogs').doc(todayKey)
-                        .delete();
-                    setSessionClicked({ practice: false, fiveMin: false, exercise: false, stretch: false });
+                if (window.confirm("確定要清空今天的打卡紀錄並重新計算嗎？")) {
+                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).delete();
                 }
             };
 
-            const openModal = () => {
-                setSessionClicked({ practice: false, fiveMin: false, exercise: false, stretch: false });
-                setIsModalOpen(true);
-            };
-
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-32">
+                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-32 lato-font">
                     <header className="bg-white/90 backdrop-blur-md sticky top-0 px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
                         <div className="flex items-center space-x-2 text-[#065f46]">
                             <div className="bg-yellow-400 p-1.5 rounded-lg neo-border-thin shadow-sm"><Icon name="Zap" size={20} /></div>
@@ -268,19 +304,19 @@
                             <div className="space-y-5">
                                 <div className="glass-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim">
                                     <div className="relative z-10 flex justify-between items-start">
-                                        <div>
+                                        <div className="flex-1 pr-2">
                                             <h2 className="jp-font text-2xl text-[#065f46] mb-1">早安，自律君！</h2>
-                                            <p className="text-gray-500 font-bold text-xs leading-relaxed max-w-[180px]">本月已堅持 {stats.monthTotalDays} 天，繼續保持！✨</p>
+                                            <p className="text-gray-500 font-bold text-xs leading-relaxed">本週已打卡 {stats.weekActiveDays} 天。✨</p>
                                         </div>
-                                        <div className="bg-white/70 p-4 rounded-3xl neo-border-thin backdrop-blur-sm text-center">
-                                            <div className="jp-font text-[#065f46] text-2xl">{Math.min(100, stats.weekTotalActions * 5)}%</div>
-                                            <div className="text-[9px] text-gray-400 font-bold">本週進度</div>
+                                        <div className="bg-white/70 px-4 py-3 rounded-3xl neo-border-thin backdrop-blur-sm text-center min-w-[100px]">
+                                            <div className="jp-font text-[#065f46] text-sm leading-tight break-words">{stats.statusLabel}</div>
+                                            <div className="text-[9px] text-gray-400 font-bold mt-1">目前境界</div>
                                         </div>
                                     </div>
                                     <Icon name="Sparkles" size={80} className="wave-bg text-[#fde68a]" />
                                 </div>
 
-                                <div className="bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow-sm flex justify-between items-center active-press">
+                                <div className="bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow-sm flex justify-between items-center">
                                     <div>
                                         <h3 className="jp-font text-[#065f46] text-lg">本週累計運動</h3>
                                         <div className="jp-font text-3xl text-[#065f46] mt-1">{stats.weekExerciseMins} <span className="text-sm">分鐘</span></div>
@@ -291,13 +327,13 @@
                                 </div>
 
                                 <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
-                                    <h3 className="jp-font text-[#065f46] mb-1">練功 <span className="text-2xl ml-1">{stats.weekPractice}</span> 次/週</h3>
-                                    <ProgressDots current={stats.weekPractice} />
+                                    <h3 className="jp-font text-[#065f46] mb-3">練功 <span className="text-2xl ml-1">{stats.weekPracticeTotal}</span> 次/週</h3>
+                                    <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="practice" />
                                 </div>
 
                                 <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
-                                    <h3 className="jp-font text-[#065f46] mb-1">五分鐘 <span className="text-2xl ml-1">{stats.weekFiveMin}</span> 次/週</h3>
-                                    <ProgressDots current={stats.weekFiveMin} />
+                                    <h3 className="jp-font text-[#065f46] mb-3">五分鐘 <span className="text-2xl ml-1">{stats.weekFiveMinTotal}</span> 次/週</h3>
+                                    <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="fiveMin" />
                                 </div>
 
                                 <button onClick={openModal} className="w-full bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow active-press flex items-center justify-center gap-3">
@@ -307,7 +343,7 @@
                             </div>
                         )}
 
-                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} todayKey={todayKey} />}
                         {activeTab === 'profile' && <ProfileView stats={stats} userId={user?.uid} onReset={handleResetToday} />}
                     </main>
 
@@ -315,40 +351,14 @@
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 overlay-blur">
                             <div className="w-full max-w-md bg-white rounded-[3.5rem] neo-border neo-shadow p-8 animate-in zoom-in-95 duration-200 relative">
                                 <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-8 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={16} /></button>
-                                <h3 className="jp-font text-2xl text-[#065f46] text-center mb-8">打卡紀錄</h3>
+                                <h3 className="jp-font text-2xl text-[#065f46] text-center mb-8">今日修煉</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <AccumulateCard 
-                                        label="練功" 
-                                        count={inputState.practice} 
-                                        sessionDone={sessionClicked.practice}
-                                        onIncrement={() => handleAccumulate('simple', 'practice')} 
-                                    />
-                                    <AccumulateCard 
-                                        label="五分鐘" 
-                                        count={inputState.fiveMin} 
-                                        sessionDone={sessionClicked.fiveMin}
-                                        onIncrement={() => handleAccumulate('simple', 'fiveMin')} 
-                                    />
-                                    <TimeAccumulateCard 
-                                        label="運動" 
-                                        totalMins={inputState.exerciseTime} 
-                                        sessionDone={sessionClicked.exercise}
-                                        onIncrement={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} 
-                                    />
-                                    <TimeAccumulateCard 
-                                        label="拉筋" 
-                                        totalMins={inputState.stretchTime} 
-                                        sessionDone={sessionClicked.stretch}
-                                        onIncrement={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} 
-                                    />
+                                    <AccumulateCard label="練功" count={inputState.practice} isLocked={sessionLocked.practice} onIncrement={() => handleAccumulate('simple', 'practice')} />
+                                    <AccumulateCard label="五分鐘" count={inputState.fiveMin} isLocked={sessionLocked.fiveMin} onIncrement={() => handleAccumulate('simple', 'fiveMin')} />
+                                    <TimeAccumulateCard label="運動" totalMins={inputState.exerciseTime} isLocked={sessionLocked.exercise} onIncrement={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
+                                    <TimeAccumulateCard label="拉筋" totalMins={inputState.stretchTime} isLocked={sessionLocked.stretch} onIncrement={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
                                 </div>
-                                
-                                <div className="mt-8 space-y-3">
-                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button>
-                                    <button onClick={handleResetToday} className="w-full py-2 text-gray-400 text-xs jp-font hover:text-red-500 transition-colors flex items-center justify-center gap-1">
-                                        <Icon name="RefreshCcw" size={12} /> 重計今日打卡
-                                    </button>
-                                </div>
+                                <div className="mt-8"><button onClick={() => setIsModalOpen(false)} className="w-full py-4 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button></div>
                             </div>
                         </div>
                     )}
@@ -356,123 +366,167 @@
                     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white neo-border rounded-full p-2 flex justify-around neo-shadow z-20">
                         <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
                         <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
-                        <NavBtn active={activeTab === 'ranking'} onClick={() => setActiveTab('ranking')} icon="Trophy" />
                         <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" />
                     </nav>
                 </div>
             );
         };
 
-        const ProgressDots = ({ current, total = 7 }) => (
-            <div className="flex justify-between gap-1 mt-3">
-                {[...Array(total)].map((_, i) => (
-                    <div key={i} className={`w-8 h-8 rounded-full neo-border flex items-center justify-center ${i < current ? 'bg-yellow-400' : 'bg-gray-50'}`}>
-                        <Icon name="Smile" size={16} className={i < current ? 'text-[#065f46]' : 'text-gray-100'} />
+        const ProfileView = ({ stats, userId, onReset }) => (
+            <div className="space-y-6 text-center animate-in fade-in duration-500 lato-font">
+                <div className="w-24 h-24 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <Icon name="User" size={56} className="text-[#065f46]" />
+                </div>
+                
+                <div className="relative inline-block px-8 py-4 bg-white neo-border rounded-[2rem] neo-shadow-sm overflow-hidden">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-[#065f46]/10"></div>
+                    <div className="jp-font text-[12px] text-[#065f46]/60 tracking-widest mb-1">目前境界</div>
+                    <h2 className="jp-font text-3xl text-[#065f46]">{stats.statusLabel}</h2>
+                    <div className="mt-2 flex justify-center gap-1">
+                        {[1,2,3].map(i => <div key={i} className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>)}
                     </div>
-                ))}
+                </div>
+
+                <div className="mt-2 mb-1">
+                   <div className="jp-font text-[#065f46] text-[12pt] border-b-2 border-[#065f46]/10 pb-1.5 inline-block px-4">本月統計</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-between aspect-square">
+                        <div className="jp-font text-[#065f46]/60 text-[14pt] tracking-tighter h-6 flex items-center">本月堅持天數</div>
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="jp-font text-6xl text-[#065f46] leading-none">{stats.monthActiveDays}</div>
+                        </div>
+                        <div className="h-4"></div>
+                    </div>
+                    <div className="bg-[#fde68a] p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-between aspect-square">
+                        <div className="jp-font text-[#065f46]/60 text-[14pt] tracking-tighter h-6 flex items-center">總運動時數</div>
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="flex items-baseline gap-1">
+                                <span className="jp-font text-4xl text-[#065f46]">{stats.monthHours}</span>
+                                <span className="jp-font text-xs text-[#065f46]">h</span>
+                                <span className="jp-font text-2xl text-[#065f46] ml-1">{stats.monthMins}</span>
+                                <span className="jp-font text-xs text-[#065f46]">m</span>
+                            </div>
+                        </div>
+                        <div className="h-4"></div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <StatBox label="練功" suffix="次" value={stats.monthPracticeTotal} />
+                    <StatBox label="五分鐘" suffix="次" value={stats.monthFiveMinTotal} />
+                    <StatBox label="運動" suffix="m" value={stats.monthWorkoutMins} />
+                    <StatBox label="拉筋" suffix="m" value={stats.monthStretchMins} />
+                </div>
+
+                <div className="pt-4">
+                    <div className="text-[9px] text-gray-300 font-mono select-all uppercase">UID: {userId}</div>
+                </div>
             </div>
         );
 
-        const AccumulateCard = ({ label, count, sessionDone, onIncrement }) => (
-            <div 
-                onClick={onIncrement} 
-                className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2.5rem] neo-border transition-all active-press cursor-pointer relative ${count > 0 && !sessionDone ? 'card-bg-active' : 'card-bg-warm'}`}
-            >
+        const StatBox = ({ label, value, suffix = "" }) => (
+            <div className="bg-white p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-center aspect-square gap-1">
+                <div className="flex items-baseline gap-1.5">
+                    <div className="jp-font text-4xl text-[#065f46] leading-none">{value}</div>
+                    <div className="jp-font text-[#065f46]/40 text-sm">{suffix}</div>
+                </div>
+                <div className="jp-font text-[#065f46]/60 text-[18pt] tracking-tighter mt-1">{label}</div>
+            </div>
+        );
+
+        const WeekProgressDots = ({ days, logs, type }) => (
+            <div className="flex justify-between items-center mt-2 px-1">
+                {days.map((date, i) => {
+                    const dKey = formatDateKey(date);
+                    const isDone = logs[dKey] && Number(logs[dKey][type]) > 0;
+                    const isHoliday = date.getDay() === 0 || date.getDay() === 6;
+                    return (
+                        <div key={i} className="flex flex-col items-center gap-1.5">
+                            <div className={`w-9 h-9 rounded-full neo-border-thin flex items-center justify-center transition-all ${isDone ? 'bg-yellow-400 shadow-sm' : 'bg-gray-50 opacity-40'}`}>
+                                <Icon name="Smile" size={18} className={isDone ? 'text-[#065f46]' : 'text-gray-200'} strokeWidth={2.5} />
+                            </div>
+                            <span className={`text-[10px] font-black lato-font ${isHoliday ? 'text-red-500' : 'text-gray-400'}`}>{date.getDate()}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+
+        const AccumulateCard = ({ label, count, isLocked, onIncrement }) => (
+            <div onClick={!isLocked ? onIncrement : undefined} className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (count > 0 ? 'card-bg-active' : 'card-bg-warm')}`}>
                 <span className="jp-font text-[#065f46] text-[24pt] leading-none mb-2">{label}</span>
                 <CustomSmile size={24} active={count > 0} count={count} offset={true} />
             </div>
         );
 
-        const TimeAccumulateCard = ({ label, totalMins, sessionDone, onIncrement }) => {
+        const TimeAccumulateCard = ({ label, totalMins, isLocked, onIncrement }) => {
             const [mins, setMins] = useState(''); 
             const [isShaking, setIsShaking] = useState(false);
-
             const handleCardClick = () => {
-                if (sessionDone) return;
-                if (!mins) {
-                    setIsShaking(true);
-                    setTimeout(() => setIsShaking(false), 500);
-                    return;
-                }
+                if (isLocked) return;
+                if (!mins) { setIsShaking(true); setTimeout(() => setIsShaking(false), 500); return; }
                 onIncrement(mins);
             };
-
             return (
-                <div 
-                    onClick={handleCardClick}
-                    className={`aspect-square flex flex-col items-center justify-between py-6 px-3 rounded-[2.5rem] neo-border transition-all relative cursor-pointer active-press ${totalMins > 0 && !sessionDone ? 'card-bg-active' : 'card-bg-warm'} ${isShaking ? 'shake-anim border-red-500' : ''}`}
-                >
-                    <div className="flex-1 flex items-center justify-center w-full">
-                        <span className="jp-font text-[#065f46] text-[24pt] leading-none">{label}</span>
-                    </div>
-                    <select 
-                        disabled={sessionDone}
-                        value={mins} 
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setMins(e.target.value)} 
-                        className={`w-full py-1.5 px-2 bg-white/80 neo-border-thin rounded-full text-[12px] jp-font text-[#065f46] focus:outline-none clean-select text-center ${isShaking ? 'border-red-400' : ''} ${sessionDone ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
+                <div onClick={handleCardClick} className={`aspect-square flex flex-col items-center justify-between py-6 px-3 rounded-[2.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (totalMins > 0 ? 'card-bg-active' : 'card-bg-warm')} ${isShaking ? 'shake-anim border-red-500' : ''}`}>
+                    <div className="flex-1 flex items-center justify-center w-full"><span className="jp-font text-[#065f46] text-[24pt] leading-none">{label}</span></div>
+                    <select disabled={isLocked} value={mins} onClick={(e) => e.stopPropagation()} onChange={(e) => setMins(e.target.value)} className={`w-full py-1.5 px-2 bg-white/80 neo-border-thin rounded-full text-[12px] jp-font text-[#065f46] focus:outline-none clean-select text-center ${isShaking ? 'border-red-400' : ''}`}>
                         <option value="">+分鐘</option>
-                        {[5,10,15,30,45,60].map(m => <option key={m} value={m}>+{m}分</option>)}
+                        {[5,10,15,30,60].map(m => <option key={m} value={m}>+{m}分</option>)}
                     </select>
-                    <div className="absolute -top-1 -right-1">
-                        <CustomSmile size={18} active={totalMins > 0} count={totalMins} label={`${totalMins}m`} />
-                    </div>
+                    <div className="absolute -top-1 -right-1"><CustomSmile size={18} active={totalMins > 0} count={totalMins} label={`${totalMins}m`} /></div>
                 </div>
             );
         };
 
-        const CalendarView = ({ dailyLogs }) => {
+        const CalendarView = ({ dailyLogs, todayKey }) => {
             const [viewMode, setViewMode] = useState('week');
             const [viewDate, setViewDate] = useState(new Date());
             const year = viewDate.getFullYear();
             const month = viewDate.getMonth();
-            
             const monthDays = useMemo(() => {
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
                 const days = [];
-                for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) days.push(null);
+                for (let i = 0; i < firstDay; i++) days.push(null);
                 for (let d = 1; d <= daysInMonth; d++) days.push(d);
                 return days;
             }, [year, month]);
-
-            const weekDays = useMemo(() => {
-                const start = new Date(viewDate);
-                const day = start.getDay();
-                const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-                start.setDate(diff);
-                return Array.from({ length: 7 }, (_, i) => {
-                    const d = new Date(start);
-                    d.setDate(start.getDate() + i);
-                    return d;
-                });
-            }, [viewDate]);
-
+            const weekDays = useMemo(() => getWeekDays(viewDate), [viewDate]);
+            const weekNumber = useMemo(() => getWeekOfMonth(viewDate), [viewDate]);
+            const jumpToToday = () => setViewDate(new Date());
             return (
-                <div className="space-y-4 animate-in fade-in duration-500">
+                <div className="space-y-4 lato-font">
                     <div className="flex bg-white rounded-2xl neo-border p-1">
                         <button onClick={() => setViewMode('week')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'week' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>週</button>
                         <button onClick={() => setViewMode('month')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'month' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>月</button>
                     </div>
-
                     <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow">
-                        <div className="flex justify-between items-center mb-6">
-                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }}><Icon name="ChevronLeft" /></button>
-                            <h2 className="jp-font text-[#065f46] text-xl">{year}年 {month + 1}月</h2>
-                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }}><Icon name="ChevronRight" /></button>
+                        <div className="flex flex-col items-center mb-6">
+                            <div className="flex items-center justify-between w-full px-2">
+                                <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }} className="active-press p-2"><Icon name="ChevronLeft" size={24} className="text-[#065f46]" /></button>
+                                <div className="text-center"><h1 className="jp-font text-[#065f46] text-[24px] leading-tight">{year} {month + 1}月</h1>{viewMode === 'week' && <div className="text-[#9CA3AF] text-[10px] jp-font">第 {weekNumber} 週</div>}</div>
+                                <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }} className="active-press p-2"><Icon name="ChevronRight" size={24} className="text-[#065f46]" /></button>
+                            </div>
+                            <button onClick={jumpToToday} className="mt-2 bg-[#fef9c3] px-6 py-1 rounded-full neo-border-thin text-[12px] jp-font text-[#065f46] active-press shadow-sm">今日</button>
                         </div>
                         {viewMode === 'month' ? (
                             <div className="grid grid-cols-7 gap-y-4">
-                                {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-center text-[10px] jp-font text-gray-300">{d}</div>)}
+                                {['日','一','二','三','四','五','六'].map((d, idx) => <div key={d} className={`text-center jp-font text-[16pt] ${idx === 0 || idx === 6 ? 'text-red-400' : 'text-[#D1D5DB]'}`}>{d}</div>)}
                                 {monthDays.map((day, i) => {
                                     if (!day) return <div key={`empty-${i}`} />;
-                                    const dKey = formatDateKey(new Date(year, month, day));
+                                    const dateObj = new Date(year, month, day);
+                                    const dKey = formatDateKey(dateObj);
                                     const log = dailyLogs[dKey];
-                                    const isDone = log && (log.practice > 0 || log.exerciseTime > 0 || log.stretchTime > 0 || log.fiveMin > 0);
+                                    const isDone = log && (Number(log.practice) > 0 || Number(log.fiveMin) > 0 || Number(log.exerciseTime) > 0 || Number(log.stretchTime) > 0);
+                                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                                    const isToday = dKey === todayKey;
                                     return (
-                                        <div key={day} className="flex flex-col items-center">
-                                            <div className={`w-8 h-8 flex items-center justify-center rounded-full jp-font text-xs ${isDone ? 'bg-yellow-400 neo-border-thin' : 'text-gray-400'}`}>{day}</div>
+                                        <div key={day} className="flex flex-col items-center gap-1">
+                                            <div className={`w-10 h-10 flex items-center justify-center rounded-full jp-font text-[22pt] transition-all ${isToday ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''} ${isHoliday ? 'text-[#EF4444]' : 'text-[#4B5563]'}`}>{day}</div>
+                                            <div className="h-7 flex items-center justify-center">{isDone && <CustomSmile size={18} active={true} hasBg={true} />}</div>
                                         </div>
                                     );
                                 })}
@@ -482,17 +536,19 @@
                                 {weekDays.map((date, i) => {
                                     const dKey = formatDateKey(date);
                                     const log = dailyLogs[dKey];
-                                    const isDone = log && (log.practice > 0 || log.exerciseTime > 0 || log.stretchTime > 0 || log.fiveMin > 0);
+                                    const isDone = log && (Number(log.practice) > 0 || Number(log.fiveMin) > 0 || Number(log.exerciseTime) > 0 || Number(log.stretchTime) > 0);
+                                    const isHoliday = date.getDay() === 0 || date.getDay() === 6;
+                                    const isToday = dKey === todayKey;
                                     return (
-                                        <div key={i} className={`flex justify-between items-center p-4 rounded-2xl neo-border-thin ${date.toDateString() === new Date().toDateString() ? 'bg-[#fffbeb]' : ''}`}>
+                                        <div key={i} className={`flex justify-between items-center p-4 rounded-2xl neo-border-thin ${isToday ? 'bg-[#fffbeb] ring-2 ring-yellow-400 ring-inset' : ''}`}>
                                             <div className="flex items-center gap-4">
-                                                <div className="text-center min-w-[40px]">
-                                                    <div className="text-[10px] text-gray-400 jp-font">{['一','二','三','四','五','六','日'][i]}</div>
-                                                    <div className="jp-font text-[#065f46]">{date.getDate()}</div>
+                                                <div className="text-center min-w-[48px]">
+                                                    <div className={`text-[12pt] jp-font ${isHoliday ? 'text-red-300' : 'text-[#D1D5DB]'}`}>{['日','一','二','三','四','五','六'][date.getDay()]}</div>
+                                                    <div className={`jp-font text-[22pt] leading-none ${isHoliday ? 'text-[#EF4444]' : 'text-[#4B5563]'}`}>{date.getDate()}</div>
                                                 </div>
-                                                <div className="jp-font text-[#065f46] text-sm">{isDone ? "今日已達成！" : "尚未紀錄"}</div>
+                                                <div className="flex flex-col"><div className="jp-font text-[#065f46] text-sm">{isDone ? "今日修煉完成" : "尚未紀錄"}</div>{isDone && <div className="text-[10px] text-gray-400 jp-font mt-0.5 lato-font">GOOD JOB!</div>}</div>
                                             </div>
-                                            <CustomSmile size={18} active={isDone} />
+                                            <CustomSmile size={24} active={isDone} hasBg={true} />
                                         </div>
                                     );
                                 })}
@@ -502,28 +558,6 @@
                 </div>
             );
         };
-
-        const ProfileView = ({ stats, userId, onReset }) => (
-            <div className="space-y-6 text-center">
-                <div className="w-24 h-24 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-4"><Icon name="User" size={56} className="text-[#065f46]" /></div>
-                <h2 className="jp-font text-2xl text-[#065f46]">自律小英雄</h2>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-5 rounded-3xl neo-border">
-                        <div className="jp-font text-3xl text-[#065f46]">{stats.monthTotalDays}</div>
-                        <div className="text-xs text-gray-400 font-bold">本月堅持(天)</div>
-                    </div>
-                    <div className="bg-white p-5 rounded-3xl neo-border">
-                        <div className="jp-font text-3xl text-[#065f46]">{stats.weekTotalActions}</div>
-                        <div className="text-xs text-gray-400 font-bold">本週打卡次數</div>
-                    </div>
-                </div>
-                <div className="pt-8">
-                    <button onClick={onReset} className="px-6 py-2 rounded-xl border border-gray-200 text-gray-400 text-xs jp-font active-press flex items-center gap-2 mx-auto">
-                        <Icon name="Trash2" size={14} /> 清空今日紀錄 (重計)
-                    </button>
-                </div>
-            </div>
-        );
 
         const NavBtn = ({ active, onClick, icon }) => (
             <button onClick={onClick} className={`p-4 rounded-full transition-all ${active ? 'bg-yellow-400 neo-border' : 'opacity-20'}`}><Icon name={icon} size={24} className="text-[#065f46]" /></button>
