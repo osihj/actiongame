@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>自律動起來</title>
-    
     <script>
         (function() {
             const originalWarn = console.warn;
@@ -14,25 +13,7 @@
             };
         })();
     </script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            green: '#beff64',
-                            yellow: '#FACC15',
-                            teal: '#065f46',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
     <script type="importmap">
     {
         "imports": {
@@ -42,252 +23,112 @@
             "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.2",
             "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
             "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-            "firebase/analytics": "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js"
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
         }
     }
     </script>
-    
-    <style>
-        body { background-color: #f8fafc; overflow-x: hidden; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
 </head>
-<body>
+<body class="bg-slate-50">
     <div id="root"></div>
-
     <script type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
+        import React, { useState, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { 
-            Calendar, Trophy, User, Plus, ChevronLeft, ChevronRight,
-            Clock, Flame, XCircle, LayoutGrid, Rows, LogIn, Mail,
-            Target, Dumbbell, Smile, Zap, LogOut, Award, BarChart3,
-            Medal, Check
-        } from 'lucide-react';
+        import { Trophy, User, Plus, LayoutGrid, Check, Zap } from 'lucide-react';
         import confetti from 'canvas-confetti';
-
-        // Firebase 模組
         import { initializeApp } from "firebase/app";
-        import { getAnalytics } from "firebase/analytics";
         import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
         import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
-        // --- 你的整合設定 ---
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
             authDomain: "actiongame-7c8c9.firebaseapp.com",
             projectId: "actiongame-7c8c9",
             storageBucket: "actiongame-7c8c9.firebasestorage.app",
             messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-            measurementId: "G-W6CNY1D4RL"
+            appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
         };
 
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'self-discipline-app';
-
-        const BRAND_GREEN = "#beff64";
-        const JAPAN_TEAL = "#065f46";
-        const NIPPON_YELLOW = "#FACC15";
-
-        // 工具函數
-        const getDateKey = (date) => {
-            const y = date.getFullYear();
-            const m = (date.getMonth() + 1).toString().padStart(2, '0');
-            const d = date.getDate().toString().padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
-
-        // 元件：狀態圖示
-        const StatusIndicator = ({ size = 20, active = false, type = "smile" }) => {
-            if (!active) return <div style={{ width: size, height: size }} className="rounded-full border-2 border-gray-100 bg-gray-50/50" />;
-            return (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill={NIPPON_YELLOW} stroke={JAPAN_TEAL} strokeWidth="1.8"/>
-                    <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
-                    <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
-                    <path d="M8 15C8.5 16.5 10 17.5 12 17.5C14 17.5 15.5 16.5 16 15" stroke={JAPAN_TEAL} strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-            );
-        };
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [dailyLogs, setDailyLogs] = useState({});
+            const [showModal, setShowModal] = useState(false);
             const [allUsers, setAllUsers] = useState([]);
-            const [showLogModal, setShowLogModal] = useState(false);
-            
-            // 打卡表單狀態
-            const [isPracticing, setIsPracticing] = useState(false);
-            const [isFiveMin, setIsFiveMin] = useState(false);
-            const [isWorkout, setIsWorkout] = useState(false);
-            const [workoutMins, setWorkoutMins] = useState(15);
 
             useEffect(() => {
-                const unsub = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    setLoading(false);
-                });
-                return unsub;
-            }, []);
-
-            // 監聽自己的打卡紀錄
-            useEffect(() => {
-                if (!user) return;
-                const logsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'logs');
-                return onSnapshot(logsRef, (snap) => {
-                    const data = {};
-                    snap.forEach(doc => data[doc.id] = doc.data());
-                    setDailyLogs(data);
-                });
-            }, [user]);
-
-            // 監聽排行榜
-            useEffect(() => {
-                const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-                return onSnapshot(usersRef, (snap) => {
+                onAuthStateChanged(auth, (u) => setUser(u));
+                return onSnapshot(collection(db, 'rankings'), (snap) => {
                     const list = [];
-                    snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-                    setAllUsers(list.sort((a,b) => (b.totalMins || 0) - (a.totalMins || 0)));
+                    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                    setAllUsers(list.sort((a,b) => b.score - a.score));
                 });
             }, []);
 
-            const handleLogin = async () => {
-                const provider = new GoogleAuthProvider();
-                try {
-                    const res = await signInWithPopup(auth, provider);
-                    const u = res.user;
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.uid), {
-                        displayName: u.displayName,
-                        photoURL: u.photoURL,
-                        lastActive: serverTimestamp()
-                    }, { merge: true });
-                } catch (e) { alert("登入失敗"); }
+            const login = async () => {
+                const res = await signInWithPopup(auth, new GoogleAuthProvider());
+                await setDoc(doc(db, 'rankings', res.user.uid), { 
+                    name: res.user.displayName, score: 0 
+                }, { merge: true });
             };
 
-            const handleSave = async () => {
-                if (!user) return;
-                const today = getDateKey(new Date());
-                const addedMins = (isWorkout ? parseInt(workoutMins) : 0) + (isPracticing ? 30 : 0) + (isFiveMin ? 5 : 0);
-                
-                try {
-                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'logs', today), {
-                        isPracticing, isFiveMin, isWorkout, workoutMins: isWorkout ? workoutMins : 0,
-                        timestamp: serverTimestamp()
-                    });
-
-                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-                    const userSnap = await getDoc(userRef);
-                    const currentTotal = userSnap.exists() ? (userSnap.data().totalMins || 0) : 0;
-                    
-                    await setDoc(userRef, {
-                        totalMins: currentTotal + addedMins,
-                        lastActive: serverTimestamp()
-                    }, { merge: true });
-
-                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                    setShowLogModal(false);
-                } catch (e) { alert("儲存失敗，請檢查資料庫規則"); }
+            const submit = async () => {
+                const ref = doc(db, 'rankings', user.uid);
+                const snap = await getDoc(ref);
+                const newScore = (snap.exists() ? snap.data().score : 0) + 10;
+                await setDoc(ref, { score: newScore }, { merge: true });
+                confetti();
+                setShowModal(false);
             };
-
-            if (loading) return <div className="h-screen flex items-center justify-center font-black">載入中...</div>;
 
             return (
-                <div className="min-h-screen pb-24">
-                    <header className="p-6 flex justify-between items-center bg-white border-b-2" style={{ borderColor: JAPAN_TEAL }}>
-                        <h1 className="text-xl font-black flex items-center gap-2" style={{ color: JAPAN_TEAL }}>
-                            <div className="w-6 h-6 bg-[#beff64] border-2 rounded" style={{ borderColor: JAPAN_TEAL }}></div>
-                            自律動起來
-                        </h1>
-                        <button onClick={() => user ? setActiveTab('profile') : handleLogin()} className="w-10 h-10 rounded-full border-2 overflow-hidden bg-gray-100" style={{ borderColor: JAPAN_TEAL }}>
-                            {user?.photoURL ? <img src={user.photoURL} /> : <User className="m-auto mt-1" />}
-                        </button>
+                <div className="max-w-md mx-auto min-h-screen flex flex-col">
+                    <header className="p-6 border-b flex justify-between items-center bg-white">
+                        <h1 className="text-xl font-bold text-emerald-800">自律動起來</h1>
+                        {user ? <img src={user.photoURL} className="w-8 h-8 rounded-full border border-emerald-800" /> : <button onClick={login} className="text-sm font-bold border px-3 py-1 rounded-lg">登入</button>}
                     </header>
 
-                    <main className="p-6 max-w-md mx-auto space-y-6">
-                        {activeTab === 'dashboard' && (
-                            <>
-                                <div className="bg-white p-6 rounded-3xl border-2 shadow-[4px_4px_0_0_#065f46]" style={{ borderColor: JAPAN_TEAL }}>
-                                    <p className="text-sm font-bold opacity-60">今日狀態</p>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <div className="flex gap-2">
-                                            <StatusIndicator active={dailyLogs[getDateKey(new Date())]?.isPracticing} size={40} />
-                                            <StatusIndicator active={dailyLogs[getDateKey(new Date())]?.isFiveMin} size={40} />
-                                        </div>
-                                        <button onClick={() => setShowLogModal(true)} className="bg-[#beff64] border-2 px-4 py-2 rounded-xl font-black" style={{ borderColor: JAPAN_TEAL }}>
-                                            打卡
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <h2 className="font-black text-lg">排行榜</h2>
-                                    {allUsers.slice(0, 5).map((u, i) => (
-                                        <div key={u.id} className="flex justify-between items-center p-4 bg-white border-2 rounded-2xl" style={{ borderColor: JAPAN_TEAL }}>
-                                            <span className="font-black opacity-30">#{i+1}</span>
-                                            <span className="font-bold flex-1 ml-4">{u.displayName}</span>
-                                            <span className="font-black" style={{ color: JAPAN_TEAL }}>{u.totalMins || 0} min</span>
+                    <main className="p-6 flex-1">
+                        {activeTab === 'dashboard' ? (
+                            <div className="space-y-6">
+                                <button onClick={() => setShowModal(true)} className="w-full bg-[#beff64] border-2 border-emerald-900 p-8 rounded-3xl font-black text-xl shadow-[4px_4px_0_0_#065f46]">
+                                    點我打卡 +10
+                                </button>
+                                <div className="space-y-3">
+                                    <h2 className="font-bold">排行榜</h2>
+                                    {allUsers.map((u, i) => (
+                                        <div key={u.id} className="flex justify-between p-4 bg-white border rounded-xl">
+                                            <span>#{i+1} {u.name}</span>
+                                            <span className="font-bold">{u.score} pt</span>
                                         </div>
                                     ))}
                                 </div>
-                            </>
-                        )}
-
-                        {activeTab === 'profile' && user && (
-                            <div className="text-center space-y-6">
-                                <div className="w-24 h-24 rounded-3xl border-4 mx-auto overflow-hidden" style={{ borderColor: JAPAN_TEAL }}>
-                                    <img src={user.photoURL} />
-                                </div>
-                                <h2 className="text-2xl font-black">{user.displayName}</h2>
-                                <button onClick={() => signOut(auth)} className="text-red-500 font-bold">登出</button>
                             </div>
+                        ) : (
+                            <div className="text-center p-10">個人檔案開發中...</div>
                         )}
                     </main>
 
-                    {/* 底部導航 */}
-                    <nav className="fixed bottom-6 left-6 right-6 bg-emerald-900 rounded-2xl p-4 flex justify-around items-center text-white shadow-xl">
+                    <nav className="fixed bottom-6 left-6 right-6 bg-emerald-900 text-white rounded-2xl p-4 flex justify-around">
                         <button onClick={() => setActiveTab('dashboard')}><LayoutGrid /></button>
-                        <button onClick={() => setActiveTab('ranking')}><Trophy /></button>
                         <button onClick={() => setActiveTab('profile')}><User /></button>
                     </nav>
 
-                    {/* 打卡彈窗 */}
-                    {showLogModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                            <div className="bg-white w-full max-w-xs rounded-[2rem] p-6 border-4" style={{ borderColor: JAPAN_TEAL }}>
-                                <h3 className="text-xl font-black mb-4">今日紀錄</h3>
-                                <div className="space-y-4">
-                                    <label className="flex items-center gap-3 font-bold">
-                                        <input type="checkbox" checked={isPracticing} onChange={e=>setIsPracticing(e.target.checked)} /> 練功 (30min)
-                                    </label>
-                                    <label className="flex items-center gap-3 font-bold">
-                                        <input type="checkbox" checked={isFiveMin} onChange={e=>setIsFiveMin(e.target.checked)} /> 五分鐘任務
-                                    </label>
-                                    <label className="flex items-center gap-3 font-bold">
-                                        <input type="checkbox" checked={isWorkout} onChange={e=>setIsWorkout(e.target.checked)} /> 運動
-                                    </label>
-                                    {isWorkout && (
-                                        <input type="number" value={workoutMins} onChange={e=>setWorkoutMins(e.target.value)} className="w-full border-2 p-2 rounded-lg" />
-                                    )}
-                                </div>
-                                <button onClick={handleSave} className="w-full mt-6 bg-[#beff64] border-2 py-3 rounded-xl font-black" style={{ borderColor: JAPAN_TEAL }}>確認送出</button>
-                                <button onClick={() => setShowLogModal(false)} className="w-full mt-2 text-sm opacity-50 font-bold">取消</button>
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6">
+                            <div className="bg-white p-6 rounded-2xl w-full max-w-xs">
+                                <h3 className="font-bold text-lg mb-4">確認打卡？</h3>
+                                <button onClick={submit} className="w-full bg-emerald-900 text-white py-3 rounded-xl font-bold">送出</button>
+                                <button onClick={() => setShowModal(false)} className="w-full mt-2 text-gray-400">取消</button>
                             </div>
                         </div>
                     )}
                 </div>
             );
         };
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
+        createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
