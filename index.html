@@ -262,7 +262,7 @@
 
                     <main className="flex-1 p-4 pb-32">
                         {activeTab === 'dashboard' && (
-                            <div className="space-y-4">
+                            <div className="flex flex-col space-y-[8px]">
                                 <div className="glass-card p-4 rounded-[1.5rem] neo-border neo-shadow float-anim">
                                     <div className="relative z-10 flex justify-between items-start">
                                         <div className="flex-1 pr-2">
@@ -287,12 +287,12 @@
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm">
+                                <div className="bg-white py-[8px] px-4 rounded-[1.5rem] neo-border neo-shadow-sm">
                                     <h3 className="jp-font text-[#065f46] mb-2 text-sm">練功 <span className="text-xl ml-1">{stats.weekPracticeTotal}</span> 次/週</h3>
                                     <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="practice" />
                                 </div>
 
-                                <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm">
+                                <div className="bg-white py-[8px] px-4 rounded-[1.5rem] neo-border neo-shadow-sm">
                                     <h3 className="jp-font text-[#065f46] mb-2 text-sm">五分鐘 <span className="text-xl ml-1">{stats.weekFiveMinTotal}</span> 次/週</h3>
                                     <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="fiveMin" />
                                 </div>
@@ -308,9 +308,10 @@
                         {activeTab === 'profile' && <ProfileView stats={stats} userId={user?.uid} />}
                     </main>
 
+                    {/* 打卡彈窗與導覽列保持原樣 */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-blur">
-                            <div className="w-full max-w-sm bg-white rounded-[1.5rem] neo-border neo-shadow p-5 animate-in zoom-in-95 duration-200 relative">
+                            <div className="w-full max-sm bg-white rounded-[1.5rem] neo-border neo-shadow p-5 animate-in zoom-in-95 duration-200 relative">
                                 <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={14} /></button>
                                 <h3 className="jp-font text-xl text-[#065f46] text-center mb-6">今日修煉</h3>
                                 
@@ -339,7 +340,6 @@
                         </div>
                     )}
 
-                    {/* 底部導覽列 */}
                     <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t-2 border-[#065f46] px-4 py-2 pb-2 z-40">
                         <div className="max-w-md mx-auto flex justify-between items-center bg-[#fde68a] neo-border rounded-full p-1 neo-shadow-sm">
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" label="主頁" />
@@ -353,7 +353,6 @@
 
         const ProfileView = ({ stats, userId }) => (
             <div className="space-y-4 text-center animate-in fade-in duration-500 flex flex-col items-center">
-                {/* 大頭圖示與境界卡片間距縮減為 5px */}
                 <div className="w-20 h-20 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto">
                     <Icon name="User" size={48} className="text-[#065f46]" />
                 </div>
@@ -363,7 +362,9 @@
                     <h2 className="jp-font text-2xl text-[#065f46] leading-none">{stats.statusLabel}</h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                {/* 個人頁面六個方框：統一網格佈局，gap-[8px] 確保上下左右距離一致 */}
+                <div className="grid grid-cols-2 gap-[8px]">
+                    {/* 第一列：主要統計 */}
                     <div className="w-[104px] h-[104px] bg-white rounded-[12px] neo-border neo-shadow-sm flex flex-col items-center justify-center">
                         <div className="jp-font text-[#065f46]/60 text-[11px] mb-1">本月堅持</div>
                         <div className="flex items-baseline gap-0.5">
@@ -380,9 +381,8 @@
                             <span className="jp-font text-[10px] text-[#065f46]">m</span>
                         </div>
                     </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-1">
+                    {/* 第二與第三列：次要數據 (StatBox) */}
                     <StatBox label="練功" suffix="次" value={stats.monthPracticeTotal} />
                     <StatBox label="五分鐘" suffix="次" value={stats.monthFiveMinTotal} />
                     <StatBox label="運動" suffix="m" value={stats.monthWorkoutMins} />
@@ -390,7 +390,6 @@
                 </div>
 
                 <div className="pt-4 flex flex-col items-center gap-1">
-                    {/* 低調標示採月統計 */}
                     <div className="jp-font text-[9px] text-gray-300 opacity-80 uppercase tracking-widest italic">數據採月統計</div>
                     <div className="text-[8px] text-gray-200 font-mono select-all uppercase break-all">UID: {userId}</div>
                 </div>
