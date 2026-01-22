@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自律動起來 - 綜合進化版</title>
+    <title>自律動起來 - 輕量精緻版</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <!-- Firebase SDKs (Using 10.x for better stability in browser environments) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -23,15 +23,15 @@
         @layer utilities {
             .neo-border { @apply border-2 border-[#065f46]; }
             .neo-border-thin { @apply border border-[#065f46]; }
-            .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
-            .neo-shadow-sm { box-shadow: 4px 4px 0px 0px #065f46; }
-            .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
+            .neo-shadow { box-shadow: 4px 4px 0px 0px #065f46; }
+            .neo-shadow-sm { box-shadow: 3px 3px 0px 0px #065f46; }
+            .active-press { @apply active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all; }
             .overlay-blur { backdrop-filter: blur(4px); background-color: rgba(6, 95, 70, 0.4); }
             .jp-font { font-family: 'Dela Gothic One', cursive; font-weight: 900; }
             .lato-font { font-family: 'Lato', sans-serif; font-weight: 400; }
             
             .float-anim { animation: float 4s ease-in-out infinite; }
-            @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+            @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
             
             .shake-anim { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
             @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
@@ -57,7 +57,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Firebase Configuration From User Input
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
             authDomain: "actiongame-7c8c9.firebaseapp.com",
@@ -68,13 +67,11 @@
             measurementId: "G-W6CNY1D4RL"
         };
 
-        // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        // Set a constant appId for collection pathing
         const appId = "discipline-app-v1";
 
         const formatDateKey = (date) => {
@@ -95,12 +92,6 @@
                 d.setDate(start.getDate() + i);
                 return d;
             });
-        };
-
-        const getWeekOfMonth = (date) => {
-            const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-            const offset = firstDayOfMonth.getDay(); 
-            return Math.ceil((date.getDate() + offset) / 7);
         };
 
         const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
@@ -142,35 +133,30 @@
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [dailyLogs, setDailyLogs] = useState({}); 
-            
-            const [sessionLocked, setSessionLocked] = useState({
-                practice: false, fiveMin: false, exercise: false, stretch: false
-            });
+            const [sessionLocked, setSessionLocked] = useState({ practice: false, fiveMin: false, exercise: false, stretch: false });
             
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
             
-            const [inputState, setInputState] = useState({
-                practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0
-            });
+            const [inputState, setInputState] = useState({ practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 });
 
             useEffect(() => {
-                // Initial Authentication: Try Anonymous Sign-in for immediate use
                 const initAuth = async () => {
                     try {
                         await auth.signInAnonymously();
                     } catch (e) {
-                        console.error("Auth error:", e);
+                        setUser({ uid: "local-user-id" });
                     }
                 };
                 initAuth();
-                const unsubscribe = auth.onAuthStateChanged(u => setUser(u));
+                const unsubscribe = auth.onAuthStateChanged(u => {
+                    if (u) setUser(u);
+                });
                 return () => unsubscribe();
             }, []);
 
             useEffect(() => {
                 if (!user) return;
-                // Follow storage rules: /artifacts/{appId}/users/{userId}/dailyLogs
                 const logsCol = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs');
                 
                 const unsubscribe = logsCol.onSnapshot((snapshot) => {
@@ -185,8 +171,6 @@
                             exerciseTime: Number(logs[todayKey].exerciseTime) || 0,
                             stretchTime: Number(logs[todayKey].stretchTime) || 0
                         });
-                    } else {
-                        setInputState({ practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 });
                     }
                 }, (error) => console.error("Firestore error:", error));
                 return () => unsubscribe();
@@ -198,63 +182,35 @@
                 const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-                let weekPracticeTotal = 0;
-                let weekFiveMinTotal = 0;
-                let weekExerciseMins = 0;
-                let weekActiveDays = 0;
-
-                let monthActiveDays = 0;
-                let monthPracticeTotal = 0;
-                let monthFiveMinTotal = 0;
-                let monthWorkoutMins = 0;
-                let monthStretchMins = 0;
-                
+                let weekPracticeTotal = 0, weekFiveMinTotal = 0, weekExerciseMins = 0, weekActiveDays = 0;
+                let monthActiveDays = 0, monthPracticeTotal = 0, monthFiveMinTotal = 0, monthWorkoutMins = 0, monthStretchMins = 0;
                 let threeWeekActiveDays = 0;
-                const threeWeeksAgo = new Date();
-                threeWeeksAgo.setDate(now.getDate() - 21);
+                const threeWeeksAgo = new Date(); threeWeeksAgo.setDate(now.getDate() - 21);
 
                 Object.entries(dailyLogs).forEach(([dateStr, data]) => {
                     const date = new Date(dateStr);
-                    const p = Number(data.practice) || 0;
-                    const f = Number(data.fiveMin) || 0;
-                    const eT = Number(data.exerciseTime) || 0;
-                    const sT = Number(data.stretchTime) || 0;
+                    const p = Number(data.practice) || 0, f = Number(data.fiveMin) || 0, eT = Number(data.exerciseTime) || 0, sT = Number(data.stretchTime) || 0;
                     const isAnyActive = (p > 0 || f > 0 || eT > 0 || sT > 0);
-
                     if (date >= weekStart) {
-                        weekPracticeTotal += p;
-                        weekFiveMinTotal += f;
-                        weekExerciseMins += (eT + sT);
+                        weekPracticeTotal += p; weekFiveMinTotal += f; weekExerciseMins += (eT + sT);
                         if (isAnyActive) weekActiveDays++;
                     }
-                    
-                    if (date >= threeWeeksAgo && isAnyActive) {
-                        threeWeekActiveDays++;
-                    }
-                    
+                    if (date >= threeWeeksAgo && isAnyActive) threeWeekActiveDays++;
                     if (dateStr.startsWith(monthPrefix)) {
                         if (isAnyActive) monthActiveDays++;
-                        monthPracticeTotal += p;
-                        monthFiveMinTotal += f;
-                        monthWorkoutMins += eT;
-                        monthStretchMins += sT;
+                        monthPracticeTotal += p; monthFiveMinTotal += f; monthWorkoutMins += eT; monthStretchMins += sT;
                     }
                 });
-
                 const totalMins = monthWorkoutMins + monthStretchMins;
-                const hours = Math.floor(totalMins / 60);
-                const mins = totalMins % 60;
-
                 let statusLabel = "加油！動起來";
                 if (monthActiveDays >= daysInMonth) statusLabel = "自律仙人";
                 else if (threeWeekActiveDays > 15) statusLabel = "自律達人";
                 else if (weekActiveDays === 7) statusLabel = "自律俠客";
                 else if (weekActiveDays >= 3) statusLabel = "穩定進步中";
-
                 return { 
                     weekActiveDays, weekPracticeTotal, weekFiveMinTotal, weekExerciseMins,
                     monthActiveDays, monthPracticeTotal, monthFiveMinTotal, monthWorkoutMins, monthStretchMins,
-                    monthHours: hours, monthMins: mins, statusLabel
+                    monthHours: Math.floor(totalMins / 60), monthMins: totalMins % 60, statusLabel 
                 };
             }, [dailyLogs, currentWeekDays]);
 
@@ -267,31 +223,17 @@
                 if (type === 'simple') {
                     updates[payload] = (inputState[payload] || 0) + 1;
                 } else if (type === 'time') {
-                    const { key, mins } = payload;
-                    updates[key] = (inputState[key] || 0) + Number(mins);
+                    updates[payload.key] = (inputState[payload.key] || 0) + Number(payload.mins);
                 }
 
                 setSessionLocked(prev => ({ ...prev, [sessionKey]: true }));
                 window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#065f46', '#fde68a', '#ffffff'] });
-
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
             };
 
-            const openModal = () => {
-                setSessionLocked({ practice: false, fiveMin: false, exercise: false, stretch: false });
-                setIsModalOpen(true);
-            };
-
-            const handleResetToday = async () => {
-                if (!user) return;
-                if (window.confirm("確定要清空今天的打卡紀錄並重新計算嗎？")) {
-                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs').doc(todayKey).delete();
-                }
-            };
-
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-32 lato-font">
-                    <header className="bg-white/90 backdrop-blur-md sticky top-0 px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
+                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-24 lato-font">
+                    <header className="bg-white/90 backdrop-blur-md sticky top-0 px-4 py-4 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
                         <div className="flex items-center space-x-2 text-[#065f46]">
                             <div className="bg-yellow-400 p-1.5 rounded-lg neo-border-thin shadow-sm"><Icon name="Zap" size={20} /></div>
                             <span className="jp-font text-xl tracking-tight">自律動起來</span>
@@ -299,71 +241,71 @@
                         <div onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-full neo-border bg-yellow-400 flex items-center justify-center cursor-pointer active-press"><Icon name="User" size={20} /></div>
                     </header>
 
-                    <main className="p-6">
+                    <main className="p-4">
                         {activeTab === 'dashboard' && (
-                            <div className="space-y-5">
-                                <div className="glass-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim">
+                            <div className="space-y-4">
+                                <div className="glass-card p-4 rounded-[1.5rem] neo-border neo-shadow float-anim">
                                     <div className="relative z-10 flex justify-between items-start">
                                         <div className="flex-1 pr-2">
-                                            <h2 className="jp-font text-2xl text-[#065f46] mb-1">早安，自律君！</h2>
-                                            <p className="text-gray-500 font-bold text-xs leading-relaxed">本週已打卡 {stats.weekActiveDays} 天。✨</p>
+                                            <h2 className="jp-font text-xl text-[#065f46] mb-1">早安，自律君！</h2>
+                                            <p className="text-gray-500 font-bold text-[11px] leading-relaxed">本週已打卡 {stats.weekActiveDays} 天。✨</p>
                                         </div>
-                                        <div className="bg-white/70 px-4 py-3 rounded-3xl neo-border-thin backdrop-blur-sm text-center min-w-[100px]">
-                                            <div className="jp-font text-[#065f46] text-sm leading-tight break-words">{stats.statusLabel}</div>
-                                            <div className="text-[9px] text-gray-400 font-bold mt-1">目前境界</div>
+                                        <div className="bg-white/70 px-4 py-2 rounded-2xl neo-border-thin backdrop-blur-sm text-center min-w-[90px]">
+                                            <div className="jp-font text-[#065f46] text-[12px] leading-tight break-words">{stats.statusLabel}</div>
+                                            <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase">目前境界</div>
                                         </div>
                                     </div>
                                     <Icon name="Sparkles" size={80} className="wave-bg text-[#fde68a]" />
                                 </div>
 
-                                <div className="bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow-sm flex justify-between items-center">
+                                <div className="bg-[#fde68a] p-4 rounded-[1.5rem] neo-border neo-shadow-sm flex justify-between items-center">
                                     <div>
-                                        <h3 className="jp-font text-[#065f46] text-lg">本週累計運動</h3>
-                                        <div className="jp-font text-3xl text-[#065f46] mt-1">{stats.weekExerciseMins} <span className="text-sm">分鐘</span></div>
+                                        <h3 className="jp-font text-[#065f46] text-md">本週累計運動</h3>
+                                        <div className="jp-font text-2xl text-[#065f46] mt-1">{stats.weekExerciseMins} <span className="text-xs">分鐘</span></div>
                                     </div>
-                                    <div className="w-14 h-14 bg-white rounded-2xl neo-border flex items-center justify-center">
-                                        <Icon name="Clock" size={32} className="text-[#065f46]" />
+                                    <div className="w-12 h-12 bg-white rounded-2xl neo-border flex items-center justify-center">
+                                        <Icon name="Clock" size={28} className="text-[#065f46]" />
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
-                                    <h3 className="jp-font text-[#065f46] mb-3">練功 <span className="text-2xl ml-1">{stats.weekPracticeTotal}</span> 次/週</h3>
+                                <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm">
+                                    <h3 className="jp-font text-[#065f46] mb-2 text-sm">練功 <span className="text-xl ml-1">{stats.weekPracticeTotal}</span> 次/週</h3>
                                     <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="practice" />
                                 </div>
 
-                                <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
-                                    <h3 className="jp-font text-[#065f46] mb-3">五分鐘 <span className="text-2xl ml-1">{stats.weekFiveMinTotal}</span> 次/週</h3>
+                                <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm">
+                                    <h3 className="jp-font text-[#065f46] mb-2 text-sm">五分鐘 <span className="text-xl ml-1">{stats.weekFiveMinTotal}</span> 次/週</h3>
                                     <WeekProgressDots days={currentWeekDays} logs={dailyLogs} type="fiveMin" />
                                 </div>
 
-                                <button onClick={openModal} className="w-full bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow active-press flex items-center justify-center gap-3">
-                                    <Icon name="PlusCircle" size={28} className="text-[#065f46]" />
-                                    <span className="jp-font text-[#065f46] text-xl">今日打卡</span>
+                                <button onClick={() => setIsModalOpen(true)} className="w-full bg-[#fde68a] p-4 rounded-[1.5rem] neo-border neo-shadow active-press flex items-center justify-center gap-3">
+                                    <Icon name="PlusCircle" size={24} className="text-[#065f46]" />
+                                    <span className="jp-font text-[#065f46] text-lg">今日打卡</span>
                                 </button>
                             </div>
                         )}
 
                         {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} todayKey={todayKey} />}
-                        {activeTab === 'profile' && <ProfileView stats={stats} userId={user?.uid} onReset={handleResetToday} />}
+                        {activeTab === 'profile' && <ProfileView stats={stats} userId={user?.uid} />}
                     </main>
 
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 overlay-blur">
-                            <div className="w-full max-w-md bg-white rounded-[3.5rem] neo-border neo-shadow p-8 animate-in zoom-in-95 duration-200 relative">
-                                <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-8 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={16} /></button>
-                                <h3 className="jp-font text-2xl text-[#065f46] text-center mb-8">今日修煉</h3>
-                                <div className="grid grid-cols-2 gap-4">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-blur">
+                            <div className="w-full max-w-sm bg-white rounded-[1.5rem] neo-border neo-shadow p-5 animate-in zoom-in-95 duration-200 relative">
+                                <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={14} /></button>
+                                <h3 className="jp-font text-xl text-[#065f46] text-center mb-6">今日修煉</h3>
+                                <div className="grid grid-cols-2 gap-3">
                                     <AccumulateCard label="練功" count={inputState.practice} isLocked={sessionLocked.practice} onIncrement={() => handleAccumulate('simple', 'practice')} />
                                     <AccumulateCard label="五分鐘" count={inputState.fiveMin} isLocked={sessionLocked.fiveMin} onIncrement={() => handleAccumulate('simple', 'fiveMin')} />
                                     <TimeAccumulateCard label="運動" totalMins={inputState.exerciseTime} isLocked={sessionLocked.exercise} onIncrement={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
                                     <TimeAccumulateCard label="拉筋" totalMins={inputState.stretchTime} isLocked={sessionLocked.stretch} onIncrement={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
                                 </div>
-                                <div className="mt-8"><button onClick={() => setIsModalOpen(false)} className="w-full py-4 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button></div>
+                                <div className="mt-6"><button onClick={() => setIsModalOpen(false)} className="w-full py-3 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button></div>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white neo-border rounded-full p-2 flex justify-around neo-shadow z-20">
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[280px] bg-white neo-border rounded-full p-1.5 flex justify-around neo-shadow z-20">
                         <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
                         <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
                         <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" />
@@ -372,82 +314,66 @@
             );
         };
 
-        const ProfileView = ({ stats, userId, onReset }) => (
-            <div className="space-y-6 text-center animate-in fade-in duration-500 lato-font">
-                <div className="w-24 h-24 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-4 shadow-sm">
-                    <Icon name="User" size={56} className="text-[#065f46]" />
+        const ProfileView = ({ stats, userId }) => (
+            <div className="space-y-4 text-center animate-in fade-in duration-500 lato-font">
+                <div className="w-20 h-20 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-2">
+                    <Icon name="User" size={48} className="text-[#065f46]" />
                 </div>
                 
-                <div className="relative inline-block px-8 py-4 bg-white neo-border rounded-[2rem] neo-shadow-sm overflow-hidden">
-                    <div className="absolute top-0 left-0 w-2 h-full bg-[#065f46]/10"></div>
-                    <div className="jp-font text-[12px] text-[#065f46]/60 tracking-widest mb-1">目前境界</div>
-                    <h2 className="jp-font text-3xl text-[#065f46]">{stats.statusLabel}</h2>
-                    <div className="mt-2 flex justify-center gap-1">
-                        {[1,2,3].map(i => <div key={i} className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>)}
+                <div className="relative inline-block px-8 py-3 bg-white neo-border rounded-[1.5rem] neo-shadow-sm">
+                    <div className="jp-font text-[10px] text-[#065f46]/60 tracking-widest mb-1">目前境界</div>
+                    <h2 className="jp-font text-2xl text-[#065f46]">{stats.statusLabel}</h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-center aspect-square">
+                        <div className="jp-font text-[#065f46]/60 text-[11px] mb-1">本月堅持</div>
+                        <div className="jp-font text-5xl text-[#065f46] leading-none">{stats.monthActiveDays}</div>
+                    </div>
+                    <div className="bg-[#fde68a] p-4 rounded-[1.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-center aspect-square">
+                        <div className="jp-font text-[#065f46]/60 text-[11px] mb-1">總運動時數</div>
+                        <div className="flex items-baseline gap-1">
+                            <span className="jp-font text-3xl text-[#065f46]">{stats.monthHours}</span>
+                            <span className="jp-font text-xs text-[#065f46]">h</span>
+                            <span className="jp-font text-xl text-[#065f46] ml-1">{stats.monthMins}</span>
+                            <span className="jp-font text-xs text-[#065f46]">m</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="mt-2 mb-1">
-                   <div className="jp-font text-[#065f46] text-[12pt] border-b-2 border-[#065f46]/10 pb-1.5 inline-block px-4">本月統計</div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-between aspect-square">
-                        <div className="jp-font text-[#065f46]/60 text-[14pt] tracking-tighter h-6 flex items-center">本月堅持天數</div>
-                        <div className="flex-1 flex items-center justify-center">
-                            <div className="jp-font text-6xl text-[#065f46] leading-none">{stats.monthActiveDays}</div>
-                        </div>
-                        <div className="h-4"></div>
-                    </div>
-                    <div className="bg-[#fde68a] p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-between aspect-square">
-                        <div className="jp-font text-[#065f46]/60 text-[14pt] tracking-tighter h-6 flex items-center">總運動時數</div>
-                        <div className="flex-1 flex items-center justify-center">
-                            <div className="flex items-baseline gap-1">
-                                <span className="jp-font text-4xl text-[#065f46]">{stats.monthHours}</span>
-                                <span className="jp-font text-xs text-[#065f46]">h</span>
-                                <span className="jp-font text-2xl text-[#065f46] ml-1">{stats.monthMins}</span>
-                                <span className="jp-font text-xs text-[#065f46]">m</span>
-                            </div>
-                        </div>
-                        <div className="h-4"></div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                     <StatBox label="練功" suffix="次" value={stats.monthPracticeTotal} />
                     <StatBox label="五分鐘" suffix="次" value={stats.monthFiveMinTotal} />
-                    <StatBox label="運動" suffix="m" value={stats.monthWorkoutMins} />
-                    <StatBox label="拉筋" suffix="m" value={stats.monthStretchMins} />
                 </div>
 
-                <div className="pt-4">
-                    <div className="text-[9px] text-gray-300 font-mono select-all uppercase">UID: {userId}</div>
+                <div className="pt-2">
+                    <div className="text-[8px] text-gray-300 font-mono select-all uppercase break-all">UID: {userId}</div>
                 </div>
             </div>
         );
 
         const StatBox = ({ label, value, suffix = "" }) => (
-            <div className="bg-white p-5 rounded-[2.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-center aspect-square gap-1">
-                <div className="flex items-baseline gap-1.5">
-                    <div className="jp-font text-4xl text-[#065f46] leading-none">{value}</div>
-                    <div className="jp-font text-[#065f46]/40 text-sm">{suffix}</div>
+            <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow-sm flex flex-col items-center justify-center aspect-square gap-1">
+                <div className="flex items-baseline gap-1">
+                    <div className="jp-font text-3xl text-[#065f46] leading-none">{value}</div>
+                    <div className="jp-font text-[#065f46]/40 text-xs">{suffix}</div>
                 </div>
-                <div className="jp-font text-[#065f46]/60 text-[18pt] tracking-tighter mt-1">{label}</div>
+                <div className="jp-font text-[#065f46]/60 text-xs mt-1">{label}</div>
             </div>
         );
 
         const WeekProgressDots = ({ days, logs, type }) => (
-            <div className="flex justify-between items-center mt-2 px-1">
+            <div className="flex justify-between items-center mt-1 px-1">
                 {days.map((date, i) => {
                     const dKey = formatDateKey(date);
                     const isDone = logs[dKey] && Number(logs[dKey][type]) > 0;
                     const isHoliday = date.getDay() === 0 || date.getDay() === 6;
                     return (
-                        <div key={i} className="flex flex-col items-center gap-1.5">
-                            <div className={`w-9 h-9 rounded-full neo-border-thin flex items-center justify-center transition-all ${isDone ? 'bg-yellow-400 shadow-sm' : 'bg-gray-50 opacity-40'}`}>
-                                <Icon name="Smile" size={18} className={isDone ? 'text-[#065f46]' : 'text-gray-200'} strokeWidth={2.5} />
+                        <div key={i} className="flex flex-col items-center gap-1">
+                            <div className={`w-8 h-8 rounded-full neo-border-thin flex items-center justify-center transition-all ${isDone ? 'bg-yellow-400 shadow-sm' : 'bg-gray-50 opacity-40'}`}>
+                                <Icon name="Smile" size={16} className={isDone ? 'text-[#065f46]' : 'text-gray-200'} strokeWidth={2.5} />
                             </div>
-                            <span className={`text-[10px] font-black lato-font ${isHoliday ? 'text-red-500' : 'text-gray-400'}`}>{date.getDate()}</span>
+                            <span className={`text-[9px] font-black lato-font ${isHoliday ? 'text-red-500' : 'text-gray-400'}`}>{date.getDate()}</span>
                         </div>
                     );
                 })}
@@ -455,9 +381,9 @@
         );
 
         const AccumulateCard = ({ label, count, isLocked, onIncrement }) => (
-            <div onClick={!isLocked ? onIncrement : undefined} className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (count > 0 ? 'card-bg-active' : 'card-bg-warm')}`}>
-                <span className="jp-font text-[#065f46] text-[24pt] leading-none mb-2">{label}</span>
-                <CustomSmile size={24} active={count > 0} count={count} offset={true} />
+            <div onClick={!isLocked ? onIncrement : undefined} className={`aspect-square flex flex-col items-center justify-center p-3 rounded-[1.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (count > 0 ? 'card-bg-active' : 'card-bg-warm')}`}>
+                <span className="jp-font text-[#065f46] text-xl leading-none mb-2">{label}</span>
+                <CustomSmile size={20} active={count > 0} count={count} offset={true} />
             </div>
         );
 
@@ -470,13 +396,13 @@
                 onIncrement(mins);
             };
             return (
-                <div onClick={handleCardClick} className={`aspect-square flex flex-col items-center justify-between py-6 px-3 rounded-[2.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (totalMins > 0 ? 'card-bg-active' : 'card-bg-warm')} ${isShaking ? 'shake-anim border-red-500' : ''}`}>
-                    <div className="flex-1 flex items-center justify-center w-full"><span className="jp-font text-[#065f46] text-[24pt] leading-none">{label}</span></div>
-                    <select disabled={isLocked} value={mins} onClick={(e) => e.stopPropagation()} onChange={(e) => setMins(e.target.value)} className={`w-full py-1.5 px-2 bg-white/80 neo-border-thin rounded-full text-[12px] jp-font text-[#065f46] focus:outline-none clean-select text-center ${isShaking ? 'border-red-400' : ''}`}>
-                        <option value="">+分鐘</option>
-                        {[5,10,15,30,60].map(m => <option key={m} value={m}>+{m}分</option>)}
+                <div onClick={handleCardClick} className={`aspect-square flex flex-col items-center justify-between py-4 px-2 rounded-[1.5rem] neo-border transition-all relative ${!isLocked ? 'active-press cursor-pointer' : 'cursor-default'} ${isLocked ? 'card-locked' : (totalMins > 0 ? 'card-bg-active' : 'card-bg-warm')} ${isShaking ? 'shake-anim border-red-500' : ''}`}>
+                    <div className="flex-1 flex items-center justify-center w-full"><span className="jp-font text-[#065f46] text-xl leading-none">{label}</span></div>
+                    <select disabled={isLocked} value={mins} onClick={(e) => e.stopPropagation()} onChange={(e) => setMins(e.target.value)} className={`w-full py-1 px-1 bg-white/80 neo-border-thin rounded-full text-[10px] jp-font text-[#065f46] focus:outline-none clean-select text-center`}>
+                        <option value="">+分</option>
+                        {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
                     </select>
-                    <div className="absolute -top-1 -right-1"><CustomSmile size={18} active={totalMins > 0} count={totalMins} label={`${totalMins}m`} /></div>
+                    <div className="absolute -top-1 -right-1"><CustomSmile size={14} active={totalMins > 0} count={totalMins} label={`${totalMins}m`} /></div>
                 </div>
             );
         };
@@ -495,60 +421,61 @@
                 return days;
             }, [year, month]);
             const weekDays = useMemo(() => getWeekDays(viewDate), [viewDate]);
-            const weekNumber = useMemo(() => getWeekOfMonth(viewDate), [viewDate]);
-            const jumpToToday = () => setViewDate(new Date());
+
             return (
                 <div className="space-y-4 lato-font">
-                    <div className="flex bg-white rounded-2xl neo-border p-1">
-                        <button onClick={() => setViewMode('week')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'week' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>週</button>
-                        <button onClick={() => setViewMode('month')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'month' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>月</button>
+                    <div className="flex bg-white rounded-xl neo-border p-1">
+                        <button onClick={() => setViewMode('week')} className={`flex-1 py-1.5 rounded-lg jp-font text-sm transition-all ${viewMode === 'week' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>週</button>
+                        <button onClick={() => setViewMode('month')} className={`flex-1 py-1.5 rounded-lg jp-font text-sm transition-all ${viewMode === 'month' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>月</button>
                     </div>
-                    <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow">
-                        <div className="flex flex-col items-center mb-6">
-                            <div className="flex items-center justify-between w-full px-2">
-                                <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }} className="active-press p-2"><Icon name="ChevronLeft" size={24} className="text-[#065f46]" /></button>
-                                <div className="text-center"><h1 className="jp-font text-[#065f46] text-[24px] leading-tight">{year} {month + 1}月</h1>{viewMode === 'week' && <div className="text-[#9CA3AF] text-[10px] jp-font">第 {weekNumber} 週</div>}</div>
-                                <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }} className="active-press p-2"><Icon name="ChevronRight" size={24} className="text-[#065f46]" /></button>
-                            </div>
-                            <button onClick={jumpToToday} className="mt-2 bg-[#fef9c3] px-6 py-1 rounded-full neo-border-thin text-[12px] jp-font text-[#065f46] active-press shadow-sm">今日</button>
+                    <div className="bg-white p-4 rounded-[1.5rem] neo-border neo-shadow">
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }} className="p-1 active:scale-90 transition-transform"><Icon name="ChevronLeft" size={20} /></button>
+                            <h1 className="jp-font text-[#065f46] text-lg tracking-wider">{year} {month + 1}月</h1>
+                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }} className="p-1 active:scale-90 transition-transform"><Icon name="ChevronRight" size={20} /></button>
                         </div>
                         {viewMode === 'month' ? (
-                            <div className="grid grid-cols-7 gap-y-4">
-                                {['日','一','二','三','四','五','六'].map((d, idx) => <div key={d} className={`text-center jp-font text-[16pt] ${idx === 0 || idx === 6 ? 'text-red-400' : 'text-[#D1D5DB]'}`}>{d}</div>)}
+                            <div className="grid grid-cols-7 gap-y-3">
+                                {['日','一','二','三','四','五','六'].map((d, idx) => <div key={d} className={`text-center jp-font text-[10px] ${idx === 0 || idx === 6 ? 'text-red-400' : 'text-gray-300'}`}>{d}</div>)}
                                 {monthDays.map((day, i) => {
                                     if (!day) return <div key={`empty-${i}`} />;
                                     const dateObj = new Date(year, month, day);
                                     const dKey = formatDateKey(dateObj);
-                                    const log = dailyLogs[dKey];
-                                    const isDone = log && (Number(log.practice) > 0 || Number(log.fiveMin) > 0 || Number(log.exerciseTime) > 0 || Number(log.stretchTime) > 0);
-                                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-                                    const isToday = dKey === todayKey;
+                                    const isDone = dailyLogs[dKey] && (Number(dailyLogs[dKey].practice) > 0 || Number(dailyLogs[dKey].exerciseTime) > 0 || Number(dailyLogs[dKey].fiveMin) > 0 || Number(dailyLogs[dKey].stretchTime) > 0);
+                                    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
                                     return (
-                                        <div key={day} className="flex flex-col items-center gap-1">
-                                            <div className={`w-10 h-10 flex items-center justify-center rounded-full jp-font text-[22pt] transition-all ${isToday ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''} ${isHoliday ? 'text-[#EF4444]' : 'text-[#4B5563]'}`}>{day}</div>
-                                            <div className="h-7 flex items-center justify-center">{isDone && <CustomSmile size={18} active={true} hasBg={true} />}</div>
+                                        <div key={day} className="flex flex-col items-center gap-0.5">
+                                            <div className={`text-[10px] jp-font ${dKey === todayKey ? 'text-yellow-500 underline font-black' : (isWeekend ? 'text-red-400' : 'text-gray-600')}`}>{day}</div>
+                                            <div className="h-4 flex items-center justify-center">{isDone && <Icon name="Smile" size={10} className="text-yellow-400" strokeWidth={4}/>}</div>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                                 {weekDays.map((date, i) => {
                                     const dKey = formatDateKey(date);
                                     const log = dailyLogs[dKey];
-                                    const isDone = log && (Number(log.practice) > 0 || Number(log.fiveMin) > 0 || Number(log.exerciseTime) > 0 || Number(log.stretchTime) > 0);
-                                    const isHoliday = date.getDay() === 0 || date.getDay() === 6;
-                                    const isToday = dKey === todayKey;
+                                    const isDone = log && (Number(log.practice) > 0 || Number(log.exerciseTime) > 0 || Number(log.fiveMin) > 0 || Number(log.stretchTime) > 0);
+                                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                    const weekNames = ['日','一','二','三','四','五','六'];
                                     return (
-                                        <div key={i} className={`flex justify-between items-center p-4 rounded-2xl neo-border-thin ${isToday ? 'bg-[#fffbeb] ring-2 ring-yellow-400 ring-inset' : ''}`}>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-center min-w-[48px]">
-                                                    <div className={`text-[12pt] jp-font ${isHoliday ? 'text-red-300' : 'text-[#D1D5DB]'}`}>{['日','一','二','三','四','五','六'][date.getDay()]}</div>
-                                                    <div className={`jp-font text-[22pt] leading-none ${isHoliday ? 'text-[#EF4444]' : 'text-[#4B5563]'}`}>{date.getDate()}</div>
+                                        <div key={i} className={`flex justify-between items-center px-[14px] py-3 rounded-xl neo-border-thin transition-all ${dKey === todayKey ? 'bg-[#fffbeb] ring-1 ring-yellow-200' : 'bg-white'}`}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-[2px]">
+                                                    <span className={`text-[10px] jp-font ${isWeekend ? 'text-red-500' : 'text-gray-400'}`}>{weekNames[date.getDay()]}</span>
+                                                    <span className={`jp-font text-lg leading-none ${isWeekend ? 'text-red-500' : (dKey === todayKey ? 'text-yellow-500' : 'text-gray-600')}`}>{date.getDate()}</span>
                                                 </div>
-                                                <div className="flex flex-col"><div className="jp-font text-[#065f46] text-sm">{isDone ? "今日修煉完成" : "尚未紀錄"}</div>{isDone && <div className="text-[10px] text-gray-400 jp-font mt-0.5 lato-font">GOOD JOB!</div>}</div>
+                                                <div className="w-[1px] h-3 bg-gray-100 mx-1"></div>
+                                                <div className={`jp-font text-xs tracking-wide ${isDone ? 'text-[#065f46]' : 'text-transparent opacity-0'}`}>
+                                                    今日修煉完成
+                                                </div>
                                             </div>
-                                            <CustomSmile size={24} active={isDone} hasBg={true} />
+                                            {isDone && (
+                                                <div className="flex items-center gap-1">
+                                                    <Icon name="Smile" size={14} className="text-yellow-400" strokeWidth={3} />
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -560,7 +487,7 @@
         };
 
         const NavBtn = ({ active, onClick, icon }) => (
-            <button onClick={onClick} className={`p-4 rounded-full transition-all ${active ? 'bg-yellow-400 neo-border' : 'opacity-20'}`}><Icon name={icon} size={24} className="text-[#065f46]" /></button>
+            <button onClick={onClick} className={`p-3 rounded-full transition-all ${active ? 'bg-yellow-400 neo-border-thin shadow-sm' : 'opacity-20 hover:opacity-40'}`}><Icon name={icon} size={20} className="text-[#065f46]" /></button>
         );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
