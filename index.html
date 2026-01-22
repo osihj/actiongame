@@ -1,227 +1,203 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自律動起來 - 完整功能版</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Practice Ranking</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <script type="importmap">
-    {
-      "imports": {
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-      }
+  <style>
+    * {
+      box-sizing: border-box;
     }
-    </script>
 
-    <style type="text/tailwindcss">
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        @layer utilities {
-            .neo-border { @apply border-2 border-[#065f46]; }
-            .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
-            .neo-shadow-sm { box-shadow: 4px 4px 0px 0px #065f46; }
-            .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
-        }
-        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f0fdf4] text-gray-600; }
-    </style>
+    body {
+      margin: 0;
+      padding: 24px 16px 40px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "PingFang TC", "Noto Sans TC", sans-serif;
+      background: #fafafa;
+      color: #2b2b2b;
+    }
+
+    h1 {
+      margin: 0 0 20px;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tab {
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      border: 1px solid #ddd;
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .tab.active {
+      background: #1f1f1f;
+      color: #fff;
+      border-color: #1f1f1f;
+    }
+
+    .container {
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      font-size: 14px;
+    }
+
+    .left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rank {
+      width: 28px;
+      text-align: center;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+
+    .name {
+      font-weight: 500;
+    }
+
+    .count {
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 32px 0;
+      opacity: 0.5;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.4;
+    }
+  </style>
 </head>
+
 <body>
-    <div id="root"></div>
+  <h1>Practice Ranking</h1>
 
-    <script type="module">
-        import { initializeApp } from "firebase/app";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+  <div class="tabs">
+    <div class="tab active" data-type="daily">每日</div>
+    <div class="tab" data-type="weekly">每週</div>
+    <div class="tab" data-type="monthly">每月</div>
+  </div>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-            authDomain: "actiongame-7c8c9.firebaseapp.com",
-            projectId: "actiongame-7c8c9",
-            storageBucket: "actiongame-7c8c9.firebasestorage.app",
-            messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
-        };
+  <div class="container">
+    <ul id="rankingList"></ul>
+    <div id="empty" class="empty" style="display:none;">目前尚無資料</div>
+  </div>
 
-        const app = initializeApp(firebaseConfig);
-        window.fb = { 
-            auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(),
-            signInWithPopup, onAuthStateChanged, signOut, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp 
-        };
-    </script>
+  <footer>
+    Build discipline · Move gently
+  </footer>
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
-        const JAPAN_TEAL = "#065f46";
-        const BRAND_GREEN = "#beff64";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-        // 圖示組件：解決 Lucide 在 CDN 環境下的渲染
-        const Icon = ({ name, size = 24, className = "" }) => {
-            const ref = useRef(null);
-            useEffect(() => {
-                if (window.lucide && ref.current) {
-                    ref.current.innerHTML = '';
-                    const icon = window.lucide.icons[name];
-                    if (icon) {
-                        const el = window.lucide.createElement(icon);
-                        el.setAttribute('width', size);
-                        el.setAttribute('height', size);
-                        el.setAttribute('stroke-width', '3');
-                        ref.current.appendChild(el);
-                    }
-                }
-            }, [name, size]);
-            return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
-        };
+    // 🔐 你的 Firebase 設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+      authDomain: "actiongame-7c8c9.firebaseapp.com",
+      projectId: "actiongame-7c8c9",
+      storageBucket: "actiongame-7c8c9.firebasestorage.app",
+      messagingSenderId: "386021872588",
+      appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
+    };
 
-        const StatusIndicator = ({ size = 20, active = false }) => (
-            <div 
-                style={{ width: size, height: size, backgroundColor: active ? JAPAN_TEAL : 'transparent' }} 
-                className={`rounded-full border-2 border-[#065f46] ${!active && 'opacity-10'}`} 
-            />
-        );
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        const App = () => {
-            const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [dailyLogs, setDailyLogs] = useState({});
-            const [showLogModal, setShowLogModal] = useState(false);
+    const rankingList = document.getElementById("rankingList");
+    const emptyState = document.getElementById("empty");
+    const tabs = document.querySelectorAll(".tab");
 
-            useEffect(() => {
-                const checkFB = setInterval(() => {
-                    if (window.fb) {
-                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
-                            setUser(u);
-                            if (u) {
-                                const logsRef = window.fb.collection(window.fb.db, 'artifacts', 'self-discipline-app', 'users', u.uid, 'logs');
-                                window.fb.onSnapshot(logsRef, (snap) => {
-                                    const data = {};
-                                    snap.forEach(d => data[d.id] = d.data());
-                                    setDailyLogs(data);
-                                });
-                            }
-                        });
-                        clearInterval(checkFB);
-                    }
-                }, 100);
-            }, []);
+    let unsubscribe = null;
+    let currentType = "daily";
 
-            // 統計邏輯
-            const weeklyMins = useMemo(() => {
-                return Object.values(dailyLogs).reduce((acc, curr) => acc + (curr.workoutMins || 0) + (curr.stretchMins || 0), 0);
-            }, [dailyLogs]);
+    function loadRanking(type) {
+      rankingList.innerHTML = "";
+      emptyState.style.display = "none";
 
-            if (!user) {
-                return (
-                    <div className="h-screen flex flex-col items-center justify-center bg-[#beff64] p-6">
-                        <div className="bg-white p-12 rounded-[3rem] neo-border neo-shadow mb-8">
-                             <Icon name="Smile" size={80} className="text-[#065f46]" />
-                        </div>
-                        <h1 className="text-4xl font-black text-[#065f46] mb-8">自律動起來</h1>
-                        <button 
-                            onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)}
-                            className="bg-white neo-border p-4 px-8 rounded-2xl font-black text-[#065f46] neo-shadow active-press flex items-center gap-3"
-                        >
-                            <Icon name="LogIn" /> Google 登入
-                        </button>
-                    </div>
-                );
-            }
+      if (unsubscribe) unsubscribe();
 
-            return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#f0fdf4] pb-32">
-                    <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0">
-                        <div className="flex items-center space-x-2 text-[#065f46]">
-                            <div className="bg-[#beff64] p-1 rounded-lg neo-border flex items-center justify-center">
-                                <Icon name="Zap" size={20} />
-                            </div>
-                            <h1 className="text-xl font-black">自律動起來</h1>
-                        </div>
-                        <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl neo-border overflow-hidden neo-shadow-sm active-press">
-                             <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
-                        </button>
-                    </header>
+      const ref = doc(db, "publicStats", "ranking_" + type);
 
-                    <main className="p-6 space-y-6">
-                        {activeTab === 'dashboard' && (
-                            <div className="space-y-6 animate-in fade-in">
-                                <section className="bg-white rounded-[1.5rem] p-6 neo-border neo-shadow flex justify-between items-center">
-                                    <h2 className="text-lg font-black text-[#065f46]">本週累計自律</h2>
-                                    <div className="flex items-baseline space-x-1">
-                                        <span className="text-4xl font-black text-[#33cc99]">{weeklyMins}</span>
-                                        <span className="text-xs font-black text-[#065f46]">min</span>
-                                    </div>
-                                </section>
+      unsubscribe = onSnapshot(ref, (snap) => {
+        rankingList.innerHTML = "";
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white rounded-[1.5rem] p-5 neo-border neo-shadow-sm">
-                                        <div className="text-xs font-black opacity-40 mb-2">練功次數</div>
-                                        <div className="text-2xl font-black text-[#065f46]">5 <span className="text-xs">次</span></div>
-                                    </div>
-                                    <div className="bg-[#beff64] rounded-[1.5rem] p-5 neo-border neo-shadow-sm">
-                                        <div className="text-xs font-black opacity-40 mb-2">五分鐘系列</div>
-                                        <div className="text-2xl font-black text-[#065f46]">12 <span className="text-xs">次</span></div>
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={() => {
-                                        window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                                        alert("打卡功能已觸發！");
-                                    }}
-                                    className="w-full bg-[#beff64] neo-border rounded-[1.5rem] p-6 flex items-center justify-center space-x-3 neo-shadow active-press"
-                                >
-                                    <Icon name="Plus" size={28} className="text-[#065f46]" />
-                                    <span className="text-xl font-black text-[#065f46]">今日打卡</span>
-                                </button>
-                            </div>
-                        )}
-                        
-                        {activeTab === 'profile' && (
-                            <div className="flex flex-col items-center py-10 space-y-6">
-                                <div className="w-24 h-24 rounded-3xl neo-border neo-shadow overflow-hidden">
-                                    <img src={user.photoURL} className="w-full h-full object-cover" />
-                                </div>
-                                <h2 className="text-2xl font-black text-[#065f46]">{user.displayName}</h2>
-                                <button 
-                                    onClick={() => window.fb.signOut(window.fb.auth)}
-                                    className="px-6 py-2 bg-white neo-border rounded-xl font-black text-red-500 neo-shadow-sm active-press"
-                                >
-                                    登出帳號
-                                </button>
-                            </div>
-                        )}
-                    </main>
-
-                    {/* 底部導覽列 */}
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white neo-border rounded-full p-2 flex justify-around neo-shadow z-20">
-                        <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
-                        <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
-                        <NavBtn active={activeTab === 'ranking'} onClick={() => setActiveTab('ranking')} icon="Trophy" />
-                        <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" />
-                    </nav>
-                </div>
-            );
+        if (!snap.exists() || !snap.data().list || snap.data().list.length === 0) {
+          emptyState.style.display = "block";
+          return;
         }
 
-        const NavBtn = ({ active, onClick, icon }) => (
-            <button 
-                onClick={onClick}
-                className={`p-4 rounded-full transition-all ${active ? 'bg-[#beff64] neo-border shadow-inner' : 'opacity-30'}`}
-            >
-                <Icon name={icon} size={24} className="text-[#065f46]" />
-            </button>
-        );
+        snap.data().list.forEach((user, index) => {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <div class="left">
+              <div class="rank">${index + 1}</div>
+              <div class="name">${user.name || "—"}</div>
+            </div>
+            <div class="count">${user.count ?? 0}</div>
+          `;
+          rankingList.appendChild(li);
+        });
+      });
+    }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentType = tab.dataset.type;
+        loadRanking(currentType);
+      });
+    });
+
+    loadRanking(currentType);
+  </script>
 </body>
 </html>
