@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自律動起來 - UI 穩定版</title>
+    <title>自律動起來 - 完整功能版</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <script type="importmap">
     {
@@ -22,14 +23,14 @@
     </script>
 
     <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         @layer utilities {
-            .neo-border { @apply border-4 border-[#065f46]; }
+            .neo-border { @apply border-2 border-[#065f46]; }
             .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
-            .neo-shadow-sm { box-shadow: 3px 3px 0px 0px #065f46; }
+            .neo-shadow-sm { box-shadow: 4px 4px 0px 0px #065f46; }
             .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
         }
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f0fdf4] overflow-x-hidden; }
+        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f0fdf4] text-gray-600; }
     </style>
 </head>
 <body>
@@ -37,8 +38,8 @@
 
     <script type="module">
         import { initializeApp } from "firebase/app";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore } from "firebase/firestore";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
@@ -50,51 +51,80 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        window.fb = { auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(), signInWithPopup, onAuthStateChanged };
+        window.fb = { 
+            auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(),
+            signInWithPopup, onAuthStateChanged, signOut, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp 
+        };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
+        const JAPAN_TEAL = "#065f46";
+        const BRAND_GREEN = "#beff64";
 
-        const Icon = ({ name, size = 24 }) => {
+        // 圖示組件：解決 Lucide 在 CDN 環境下的渲染
+        const Icon = ({ name, size = 24, className = "" }) => {
             const ref = useRef(null);
             useEffect(() => {
                 if (window.lucide && ref.current) {
                     ref.current.innerHTML = '';
                     const icon = window.lucide.icons[name];
                     if (icon) {
-                        const element = window.lucide.createElement(icon);
-                        element.setAttribute('width', size);
-                        element.setAttribute('height', size);
-                        element.setAttribute('stroke-width', '3');
-                        ref.current.appendChild(element);
+                        const el = window.lucide.createElement(icon);
+                        el.setAttribute('width', size);
+                        el.setAttribute('height', size);
+                        el.setAttribute('stroke-width', '3');
+                        ref.current.appendChild(el);
                     }
                 }
             }, [name, size]);
-            return <span ref={ref} className="flex items-center justify-center w-6 h-6"></span>;
+            return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
         };
+
+        const StatusIndicator = ({ size = 20, active = false }) => (
+            <div 
+                style={{ width: size, height: size, backgroundColor: active ? JAPAN_TEAL : 'transparent' }} 
+                className={`rounded-full border-2 border-[#065f46] ${!active && 'opacity-10'}`} 
+            />
+        );
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('home');
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [dailyLogs, setDailyLogs] = useState({});
+            const [showLogModal, setShowLogModal] = useState(false);
 
             useEffect(() => {
-                const check = setInterval(() => {
+                const checkFB = setInterval(() => {
                     if (window.fb) {
-                        window.fb.onAuthStateChanged(window.fb.auth, (u) => setUser(u));
-                        clearInterval(check);
+                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
+                            setUser(u);
+                            if (u) {
+                                const logsRef = window.fb.collection(window.fb.db, 'artifacts', 'self-discipline-app', 'users', u.uid, 'logs');
+                                window.fb.onSnapshot(logsRef, (snap) => {
+                                    const data = {};
+                                    snap.forEach(d => data[d.id] = d.data());
+                                    setDailyLogs(data);
+                                });
+                            }
+                        });
+                        clearInterval(checkFB);
                     }
-                }, 200);
+                }, 100);
             }, []);
+
+            // 統計邏輯
+            const weeklyMins = useMemo(() => {
+                return Object.values(dailyLogs).reduce((acc, curr) => acc + (curr.workoutMins || 0) + (curr.stretchMins || 0), 0);
+            }, [dailyLogs]);
 
             if (!user) {
                 return (
-                    <div className="h-screen flex flex-col items-center justify-center bg-[#beff64] p-6 text-center">
-                        <div className="bg-white p-10 rounded-[3rem] neo-border neo-shadow mb-8 animate-bounce">
-                            <Icon name="Smile" size={60} />
+                    <div className="h-screen flex flex-col items-center justify-center bg-[#beff64] p-6">
+                        <div className="bg-white p-12 rounded-[3rem] neo-border neo-shadow mb-8">
+                             <Icon name="Smile" size={80} className="text-[#065f46]" />
                         </div>
-                        <h1 className="text-4xl font-black text-[#065f46] mb-2">自律動起來</h1>
-                        <p className="font-bold text-[#065f46] opacity-60 mb-10 text-sm">讓堅持變得像遊戲一樣有趣</p>
+                        <h1 className="text-4xl font-black text-[#065f46] mb-8">自律動起來</h1>
                         <button 
                             onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)}
                             className="bg-white neo-border p-4 px-8 rounded-2xl font-black text-[#065f46] neo-shadow active-press flex items-center gap-3"
@@ -106,19 +136,92 @@
             }
 
             return (
-                <div className="flex flex-col h-screen max-w-md mx-auto relative overflow-hidden">
-                    {/* Header */}
-                    <header className="bg-white p-4 neo-border border-t-0 border-x-0 flex justify-between items-center z-10">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-[#beff64] p-1 rounded-lg neo-border shadow-sm">
-                                <Icon name="Zap" size={18} />
+                <div className="max-w-md mx-auto min-h-screen bg-[#f0fdf4] pb-32">
+                    <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0">
+                        <div className="flex items-center space-x-2 text-[#065f46]">
+                            <div className="bg-[#beff64] p-1 rounded-lg neo-border flex items-center justify-center">
+                                <Icon name="Zap" size={20} />
                             </div>
-                            <span className="font-black text-[#065f46] text-lg">自律動起來</span>
+                            <h1 className="text-xl font-black">自律動起來</h1>
                         </div>
-                        <img src={user.photoURL} className="w-10 h-10 rounded-xl neo-border neo-shadow-sm" />
+                        <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl neo-border overflow-hidden neo-shadow-sm active-press">
+                             <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+                        </button>
                     </header>
 
-                    {/* Content Scroll Area */}
-                    <main className="flex-1 overflow-y-auto p-6 space-y-6">
-                        <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow">
-                            <h2 className="text-xl font-black text-[#065f46]">你好，{user.displayName.split(' ')
+                    <main className="p-6 space-y-6">
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6 animate-in fade-in">
+                                <section className="bg-white rounded-[1.5rem] p-6 neo-border neo-shadow flex justify-between items-center">
+                                    <h2 className="text-lg font-black text-[#065f46]">本週累計自律</h2>
+                                    <div className="flex items-baseline space-x-1">
+                                        <span className="text-4xl font-black text-[#33cc99]">{weeklyMins}</span>
+                                        <span className="text-xs font-black text-[#065f46]">min</span>
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white rounded-[1.5rem] p-5 neo-border neo-shadow-sm">
+                                        <div className="text-xs font-black opacity-40 mb-2">練功次數</div>
+                                        <div className="text-2xl font-black text-[#065f46]">5 <span className="text-xs">次</span></div>
+                                    </div>
+                                    <div className="bg-[#beff64] rounded-[1.5rem] p-5 neo-border neo-shadow-sm">
+                                        <div className="text-xs font-black opacity-40 mb-2">五分鐘系列</div>
+                                        <div className="text-2xl font-black text-[#065f46]">12 <span className="text-xs">次</span></div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => {
+                                        window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                                        alert("打卡功能已觸發！");
+                                    }}
+                                    className="w-full bg-[#beff64] neo-border rounded-[1.5rem] p-6 flex items-center justify-center space-x-3 neo-shadow active-press"
+                                >
+                                    <Icon name="Plus" size={28} className="text-[#065f46]" />
+                                    <span className="text-xl font-black text-[#065f46]">今日打卡</span>
+                                </button>
+                            </div>
+                        )}
+                        
+                        {activeTab === 'profile' && (
+                            <div className="flex flex-col items-center py-10 space-y-6">
+                                <div className="w-24 h-24 rounded-3xl neo-border neo-shadow overflow-hidden">
+                                    <img src={user.photoURL} className="w-full h-full object-cover" />
+                                </div>
+                                <h2 className="text-2xl font-black text-[#065f46]">{user.displayName}</h2>
+                                <button 
+                                    onClick={() => window.fb.signOut(window.fb.auth)}
+                                    className="px-6 py-2 bg-white neo-border rounded-xl font-black text-red-500 neo-shadow-sm active-press"
+                                >
+                                    登出帳號
+                                </button>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* 底部導覽列 */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white neo-border rounded-full p-2 flex justify-around neo-shadow z-20">
+                        <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
+                        <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
+                        <NavBtn active={activeTab === 'ranking'} onClick={() => setActiveTab('ranking')} icon="Trophy" />
+                        <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="User" />
+                    </nav>
+                </div>
+            );
+        }
+
+        const NavBtn = ({ active, onClick, icon }) => (
+            <button 
+                onClick={onClick}
+                className={`p-4 rounded-full transition-all ${active ? 'bg-[#beff64] neo-border shadow-inner' : 'opacity-30'}`}
+            >
+                <Icon name={icon} size={24} className="text-[#065f46]" />
+            </button>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
