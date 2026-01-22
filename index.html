@@ -269,9 +269,9 @@
                                             <h2 className="jp-font text-xl text-[#065f46] mb-1">早安，自律君！</h2>
                                             <p className="text-gray-500 font-bold text-[11px] leading-relaxed">本週已打卡 {stats.weekActiveDays} 天。✨</p>
                                         </div>
-                                        <div className="bg-white/70 px-4 py-2 rounded-2xl neo-border-thin backdrop-blur-sm text-center min-w-[90px]">
-                                            <div className="jp-font text-[#065f46] text-[12px] leading-tight break-words">{stats.statusLabel}</div>
-                                            <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase">目前境界</div>
+                                        <div className="bg-white/70 px-4 py-[6px] rounded-2xl neo-border-thin backdrop-blur-sm text-center min-w-[90px] flex flex-col justify-center items-center">
+                                            <div className="jp-font text-[#065f46] text-[12px] leading-none break-words">{stats.statusLabel}</div>
+                                            <div className="text-[8px] text-gray-400 font-bold mt-[3px] uppercase leading-none">目前境界</div>
                                         </div>
                                     </div>
                                     <Icon name="Sparkles" size={80} className="wave-bg text-[#fde68a]" />
@@ -353,19 +353,23 @@
 
         const ProfileView = ({ stats, userId }) => (
             <div className="space-y-4 text-center animate-in fade-in duration-500 flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-2">
+                {/* 大頭圖示與境界卡片間距縮減為 5px */}
+                <div className="w-20 h-20 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto">
                     <Icon name="User" size={48} className="text-[#065f46]" />
                 </div>
                 
-                <div className="relative inline-block px-8 py-3 bg-white neo-border rounded-[1.5rem] neo-shadow-sm mb-2">
-                    <div className="jp-font text-[10px] text-[#065f46]/60 tracking-widest mb-1">目前境界</div>
-                    <h2 className="jp-font text-2xl text-[#065f46]">{stats.statusLabel}</h2>
+                <div className="relative inline-flex flex-col items-center justify-center px-8 py-[10px] bg-white neo-border rounded-[1.5rem] neo-shadow-sm mb-2" style={{ marginTop: '5px' }}>
+                    <div className="jp-font text-[10px] text-[#065f46]/60 tracking-widest mb-[2px] leading-none">目前境界</div>
+                    <h2 className="jp-font text-2xl text-[#065f46] leading-none">{stats.statusLabel}</h2>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                     <div className="w-[104px] h-[104px] bg-white rounded-[12px] neo-border neo-shadow-sm flex flex-col items-center justify-center">
                         <div className="jp-font text-[#065f46]/60 text-[11px] mb-1">本月堅持</div>
-                        <div className="jp-font text-4xl text-[#065f46] leading-none">{stats.monthActiveDays}</div>
+                        <div className="flex items-baseline gap-0.5">
+                            <div className="jp-font text-4xl text-[#065f46] leading-none">{stats.monthActiveDays}</div>
+                            <div className="jp-font text-[#065f46]/60 text-[10px]">天</div>
+                        </div>
                     </div>
                     <div className="w-[104px] h-[104px] bg-[#fde68a] rounded-[12px] neo-border neo-shadow-sm flex flex-col items-center justify-center">
                         <div className="jp-font text-[#065f46]/60 text-[11px] mb-1">運動時數</div>
@@ -381,10 +385,14 @@
                 <div className="grid grid-cols-2 gap-2 mt-1">
                     <StatBox label="練功" suffix="次" value={stats.monthPracticeTotal} />
                     <StatBox label="五分鐘" suffix="次" value={stats.monthFiveMinTotal} />
+                    <StatBox label="運動" suffix="m" value={stats.monthWorkoutMins} />
+                    <StatBox label="拉筋" suffix="m" value={stats.monthStretchMins} />
                 </div>
 
-                <div className="pt-4">
-                    <div className="text-[8px] text-gray-300 font-mono select-all uppercase break-all">UID: {userId}</div>
+                <div className="pt-4 flex flex-col items-center gap-1">
+                    {/* 低調標示採月統計 */}
+                    <div className="jp-font text-[9px] text-gray-300 opacity-80 uppercase tracking-widest italic">數據採月統計</div>
+                    <div className="text-[8px] text-gray-200 font-mono select-all uppercase break-all">UID: {userId}</div>
                 </div>
             </div>
         );
@@ -479,7 +487,7 @@
                                 <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }} className="p-1 active:scale-90 transition-transform"><Icon name="ChevronLeft" size={20} /></button>
                                 <div className="flex flex-col items-center">
                                     <h1 className="jp-font text-[#065f46] text-lg tracking-wider leading-none">{year} {month + 1}月</h1>
-                                    <button onClick={goToday} className="mt-1 px-3 py-0.5 bg-yellow-400 neo-border-thin rounded-full jp-font text-[9px] text-[#065f46] active-press">今日</button>
+                                    <button onClick={goToday} className="mt-1 px-3 py-0.5 bg-yellow-100 neo-border-thin rounded-full jp-font text-[9px] text-[#065f46] active-press">今日</button>
                                 </div>
                                 <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }} className="p-1 active:scale-90 transition-transform"><Icon name="ChevronRight" size={20} /></button>
                             </div>
@@ -520,11 +528,10 @@
                                     const isDone = log && (Number(log.practice) > 0 || Number(log.exerciseTime) > 0 || Number(log.fiveMin) > 0 || Number(log.stretchTime) > 0);
                                     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                                     return (
-                                        <div key={i} className={`flex justify-between items-center px-[14px] py-4 rounded-xl neo-border-thin transition-all ${dKey === todayKey ? 'bg-[#fffbeb] ring-1 ring-yellow-200' : 'bg-white'}`}>
+                                        <div key={i} className={`flex justify-between items-center px-[14px] py-[14px] rounded-xl neo-border-thin transition-all ${dKey === todayKey ? 'bg-[#fffbeb] ring-1 ring-yellow-200' : 'bg-white'}`}>
                                             <div className="flex items-center translate-x-[5px]">
-                                                {/* 星期與日期之間間距微調為 16px */}
                                                 <span className={`text-[11px] jp-font min-w-[20px] ${isWeekend ? 'text-red-500' : 'text-gray-400'}`}>{weekNames[date.getDay()]}</span>
-                                                <div style={{ width: '16px' }}></div> 
+                                                <div style={{ width: '3px' }}></div> 
                                                 <span className={`jp-font text-xl leading-none ${isWeekend ? 'text-red-500' : (dKey === todayKey ? 'text-yellow-500' : 'text-gray-600')}`}>{date.getDate()}</span>
                                                 
                                                 <div className="w-[1px] h-3 bg-gray-100 mx-4"></div>
