@@ -1,129 +1,161 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>打卡排行榜</title>
-<style>
-  body { font-family: Arial, sans-serif; margin:20px; }
-  button { margin:5px; padding:10px 15px; }
-  #ranking { margin-top:20px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日系極簡自律打卡 App</title>
+  <script type="module">
+    // Firebase SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+      authDomain: "actiongame-7c8c9.firebaseapp.com",
+      projectId: "actiongame-7c8c9",
+      storageBucket: "actiongame-7c8c9.appspot.com",
+      messagingSenderId: "386021872588",
+      appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
+      measurementId: "G-W6CNY1D4RL"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    
+    let currentUser = null;
+    
+    async function login() {
+      await signInWithPopup(auth, provider);
+    }
+    
+    async function logout() {
+      await signOut(auth);
+    }
+    
+    async function checkIn() {
+      if (!currentUser) return;
+      const userRef = doc(db, "users", currentUser.uid);
+      const docSnap = await getDoc(userRef);
+      let count = 0;
+      if (docSnap.exists()) {
+        count = docSnap.data().checkinCount || 0;
+        count += 1;
+        await updateDoc(userRef, { checkinCount: count });
+      } else {
+        await setDoc(userRef, { name: currentUser.displayName, checkinCount: 1 });
+        count = 1;
+      }
+      document.getElementById("weekCount").innerText = count;
+      triggerConfetti();
+      updateLeaderboard();
+      updateCalendar();
+    }
+    
+    async function updateLeaderboard() {
+      const q = query(collection(db, "users"), orderBy("checkinCount", "desc"));
+      const querySnapshot = await getDocs(q);
+      const leaderboard = document.getElementById("leaderboard");
+      leaderboard.innerHTML = "";
+      let rank = 1;
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between p-2 border-b border-[#065f46]";
+        li.innerHTML = `<span>#${rank}</span>
+                        <span>${data.name}</span>
+                        <span>${data.checkinCount}</span>`;
+        leaderboard.appendChild(li);
+        rank++;
+      });
+    }
+    
+    function updateCalendar() {
+      const cal = document.getElementById("calendar");
+      cal.innerHTML = "";
+      const days = 7; // 週視圖
+      for (let i=0;i<days;i++) {
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "w-10 h-10 flex items-center justify-center border border-[#065f46] rounded-3xl";
+        dayDiv.innerText = "😃"; // 簡單用笑臉表示已打卡
+        cal.appendChild(dayDiv);
+      }
+    }
+    
+    function triggerConfetti() {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js";
+      script.onload = () => {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#beff64', '#FACC15']
+        });
+      };
+      document.body.appendChild(script);
+    }
+    
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      if (user) {
+        document.getElementById("loginBtn").style.display = "none";
+        document.getElementById("logoutBtn").style.display = "block";
+        document.getElementById("userName").innerText = user.displayName;
+        updateLeaderboard();
+        updateCalendar();
+      } else {
+        document.getElementById("loginBtn").style.display = "block";
+        document.getElementById("logoutBtn").style.display = "none";
+        document.getElementById("userName").innerText = "";
+      }
+    });
+    
+    window.login = login;
+    window.logout = logout;
+    window.checkIn = checkIn;
+  </script>
+  <style>
+    body { font-family: sans-serif; background: #F9FAFB; color: #065f46; margin:0; padding:0; }
+    .btn { padding: 1rem 2rem; border-radius: 2rem; border: 2px solid #065f46; background: #beff64; cursor:pointer; font-weight:bold; box-shadow: 6px 6px #065f46; transition: transform 0.1s; }
+    .btn:active { transform: translateY(2px); }
+    nav { position: fixed; bottom:0; left:50%; transform: translateX(-50%); width:95%; display:flex; justify-around; padding:0.5rem; background:#FFFFFF; border-radius:2rem; box-shadow:0 6px #065f46; }
+    .card { background:#FFFFFF; border:2px solid #065f46; border-radius:2rem; padding:1rem; margin:1rem; box-shadow:6px 6px #065f46; }
+    #calendar { display:flex; gap:4px; margin:1rem 0; }
+    #leaderboard { list-style:none; padding:0; margin:0; }
+    #leaderboard li { display:flex; justify-content:space-between; }
+  </style>
 </head>
 <body>
+  <header class="card">
+    <span id="userName"></span>
+    <button id="loginBtn" class="btn" onclick="login()">Google 登入</button>
+    <button id="logoutBtn" class="btn" onclick="logout()" style="display:none;">登出</button>
+  </header>
 
-<h1>每日打卡排行榜</h1>
-<div id="auth">
-  <button id="loginBtn">Google 登入</button>
-  <button id="logoutBtn" style="display:none;">登出</button>
-</div>
+  <main class="card">
+    <h2>本週累計分鐘數</h2>
+    <div id="weekCount" class="text-3xl font-black text-[#FACC15]">0</div>
+    <button class="btn mt-4" onclick="checkIn()">＋ 打卡</button>
+  </main>
 
-<div id="userArea" style="display:none;">
-  <h3 id="welcome"></h3>
-  <div>
-    <button data-type="practice">Practice +1</button>
-    <button data-type="fiveMin">5分鐘 +1</button>
-    <button data-type="workout">Workout +1</button>
-    <button data-type="stretch">Stretch +1</button>
-  </div>
-  <h3>排行榜 (前10名)</h3>
-  <ol id="ranking"></ol>
-</div>
+  <section class="card">
+    <h2>日曆 (週視圖)</h2>
+    <div id="calendar"></div>
+  </section>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+  <section class="card">
+    <h2>排行榜</h2>
+    <ol id="leaderboard"></ol>
+  </section>
 
-// Firebase 配置
-const firebaseConfig = {
-  apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-  authDomain: "actiongame-7c8c9.firebaseapp.com",
-  projectId: "actiongame-7c8c9",
-  storageBucket: "actiongame-7c8c9.firebasestorage.app",
-  messagingSenderId: "386021872588",
-  appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-  measurementId: "G-W6CNY1D4RL"
-};
-
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth();
-const db = getFirestore();
-const provider = new GoogleAuthProvider();
-
-// 元件
-const loginBtn = document.getElementById('loginBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-const userArea = document.getElementById('userArea');
-const welcome = document.getElementById('welcome');
-const rankingEl = document.getElementById('ranking');
-const buttons = document.querySelectorAll('#userArea button[data-type]');
-
-loginBtn.addEventListener('click', async () => {
-  await signInWithPopup(auth, provider);
-});
-
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-});
-
-onAuthStateChanged(auth, user => {
-  if(user){
-    loginBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-    userArea.style.display = 'block';
-    welcome.textContent = `歡迎, ${user.displayName}`;
-    updateRanking();
-  } else {
-    loginBtn.style.display = 'inline-block';
-    logoutBtn.style.display = 'none';
-    userArea.style.display = 'none';
-  }
-});
-
-// 打卡功能
-buttons.forEach(btn=>{
-  btn.addEventListener('click', async ()=>{
-    const type = btn.dataset.type;
-    const user = auth.currentUser;
-    if(!user) return alert("請先登入");
-    await logActivity(user, type);
-    updateRanking();
-  });
-});
-
-async function logActivity(user, type){
-  const dateKey = new Date().toISOString().slice(0,10);
-  const logRef = doc(db, "users", user.uid, "logs", dateKey);
-  const userRef = doc(db, "users", user.uid);
-
-  const logSnap = await getDoc(logRef);
-  const logData = logSnap.exists() ? logSnap.data() : { practice:0, fiveMin:0, workout:0, stretch:0 };
-  logData[type] = (logData[type] || 0) + 1;
-  await setDoc(logRef, logData, { merge:true });
-
-  const userSnap = await getDoc(userRef);
-  const prevData = userSnap.exists() ? userSnap.data() : { total:0, name: user.displayName };
-  prevData.total = (prevData.total || 0) + 1;
-  prevData.name = user.displayName;
-  await setDoc(userRef, prevData, { merge:true });
-}
-
-// 排行榜
-async function updateRanking(){
-  rankingEl.innerHTML = "";
-  const q = query(collection(db, "users"), orderBy("total", "desc"), limit(10));
-  const snapshot = await getDocs(q);
-  snapshot.forEach(doc=>{
-    const data = doc.data();
-    const li = document.createElement('li');
-    li.textContent = `${data.name}: ${data.total}`;
-    rankingEl.appendChild(li);
-  });
-}
-</script>
-
+  <nav>
+    <button>首頁</button>
+    <button>日曆</button>
+    <button>排行榜</button>
+    <button>個人</button>
+  </nav>
 </body>
 </html>
