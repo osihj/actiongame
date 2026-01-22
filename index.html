@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來 - 完整版</title>
+    <title>自律動起來 - 穩定發佈版</title>
+    
+    <link href="style.css" rel="stylesheet">
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
@@ -22,29 +23,21 @@
     }
     </script>
 
-    <script>
-        // 隱藏不需要的開發警告
-        const originalWarn = console.warn;
-        console.warn = (...args) => {
-            if (args[0]?.includes?.('cdn.tailwindcss.com') || args[0]?.includes?.('in-browser Babel')) return;
-            originalWarn(...args);
-        };
-    </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #ffffff; margin: 0; }
-        .neo-brutalism { border: 3px solid #065f46; box-shadow: 6px 6px 0px 0px #065f46; }
-        .active-press:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px 0px #065f46; }
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
+        .neo-shadow-sm { box-shadow: 3px 3px 0px 0px #065f46; }
+        .active-press:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px 0px #065f46; }
     </style>
 </head>
-<body>
+<body class="bg-[#f0fdf4]">
     <div id="root"></div>
 
     <script type="module">
         import { initializeApp } from "firebase/app";
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
@@ -56,144 +49,127 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
-
-        // 暴露給全域
-        window.fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp };
+        window.fb = { 
+            auth: getAuth(app), db: getFirestore(app), provider: new GoogleAuthProvider(),
+            signInWithPopup, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, onSnapshot, serverTimestamp, query, orderBy, limit
+        };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
         const JAPAN_TEAL = "#065f46";
         const BRAND_GREEN = "#beff64";
 
-        // 圖示組件：解決 lucide-react 在 CDN 下的調用問題
+        // 核心：解決 GitHub 上 Lucide 圖示抓不到的問題
         const Icon = ({ name, size = 24, className = "" }) => {
-            const iconRef = React.useRef(null);
+            const iconRef = useRef(null);
             useEffect(() => {
                 if (window.lucide && iconRef.current) {
                     iconRef.current.innerHTML = "";
-                    const iconData = window.lucide.icons[name] || window.lucide.icons[name.toLowerCase()];
+                    const iconData = window.lucide.icons[name];
                     if (iconData) {
                         const svg = window.lucide.createElement(iconData);
                         svg.setAttribute('width', size);
                         svg.setAttribute('height', size);
-                        svg.setAttribute('class', className);
                         svg.setAttribute('stroke', 'currentColor');
                         svg.setAttribute('stroke-width', '3');
+                        svg.setAttribute('class', className);
                         iconRef.current.appendChild(svg);
                     }
                 }
             }, [name, size, className]);
-            return <span ref={iconRef} className="inline-flex items-center"></span>;
+            return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
         };
 
-        const StatusIndicator = ({ size = 20, active = false, type = "smile" }) => {
-            if (!active) return <div style={{ width: size, height: size }} className="rounded-full border-2 border-gray-100 bg-gray-50" />;
-            return (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="#FACC15" stroke={JAPAN_TEAL} strokeWidth="1.8"/>
-                    <circle cx="9" cy="10" r="1.2" fill={JAPAN_TEAL}/>
-                    <circle cx="15" cy="10" r="1.2" fill={JAPAN_TEAL}/>
-                    <path d="M8 15C8.5 16.5 10 17.5 12 17.5C14 17.5 15.5 16.5 16 15" stroke={JAPAN_TEAL} strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-            );
-        };
-
-        function App() {
+        const App = () => {
             const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [dailyLogs, setDailyLogs] = useState({});
+            const [rankings, setRankings] = useState([]);
+            const [showLogModal, setShowLogModal] = useState(false);
 
             useEffect(() => {
-                const unsubscribe = window.fb.onAuthStateChanged(window.fb.auth, (u) => {
-                    setUser(u);
-                    setLoading(false);
-                });
-                return () => unsubscribe();
+                const checkFB = setInterval(() => {
+                    if (window.fb) {
+                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
+                            setUser(u);
+                            if (u) {
+                                // 監聽個人資料與日誌
+                                const logsRef = window.fb.collection(window.fb.db, 'artifacts', 'self-discipline-app', 'users', u.uid, 'logs');
+                                window.fb.onSnapshot(logsRef, (snap) => {
+                                    const data = {};
+                                    snap.forEach(d => data[d.id] = d.data());
+                                    setDailyLogs(data);
+                                });
+                            }
+                        });
+                        clearInterval(checkFB);
+                    }
+                }, 100);
             }, []);
 
             const handleLogin = async () => {
-                try {
-                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
-                } catch (err) {
-                    console.error("登入出錯", err);
-                    alert("登入失敗，請檢查是否已在 Firebase 授權網域：" + err.message);
-                }
+                try { await window.fb.signInWithPopup(window.fb.auth, window.fb.provider); } catch (e) { alert("登入失敗"); }
             };
-
-            if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#065f46]">載入中...</div>;
 
             if (!user) {
                 return (
-                    <div className="h-screen bg-[#beff64] flex flex-col items-center justify-center p-6 text-center">
-                        <div className="bg-white p-12 rounded-[3rem] neo-brutalism active-press mb-8">
-                            <StatusIndicator size={80} active={true} />
+                    <div className="h-screen flex flex-col items-center justify-center p-6 bg-[#beff64]">
+                        <div className="bg-white p-12 rounded-[3rem] border-4 border-[#065f46] neo-shadow mb-8">
+                             <Icon name="Smile" size={80} className="text-[#065f46]" />
                         </div>
-                        <h1 className="text-4xl font-black mb-4 text-[#065f46]">自律動起來</h1>
-                        <p className="mb-8 font-bold text-[#065f46] opacity-70">登入後開始追蹤你的健身與練功進度</p>
-                        <button onClick={handleLogin} className="bg-white border-4 border-[#065f46] p-4 rounded-3xl flex items-center space-x-3 neo-brutalism active-press font-black text-[#065f46]">
-                            <Icon name="LogIn" />
-                            <span>使用 Google 登入</span>
+                        <h1 className="text-4xl font-black text-[#065f46] mb-8">自律動起來</h1>
+                        <button onClick={handleLogin} className="bg-white border-4 border-[#065f46] p-4 rounded-3xl font-black text-[#065f46] neo-shadow-sm active-press flex items-center gap-3">
+                            <Icon name="LogIn" /> 使用 Google 登入
                         </button>
                     </div>
                 );
             }
 
             return (
-                <div className="max-w-md mx-auto min-h-screen pb-32">
-                    {/* Header */}
-                    <header className="p-6 flex justify-between items-center bg-white border-b-2 border-[#065f46] sticky top-0 z-10">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 bg-[#beff64] border-2 border-[#065f46] rounded-lg"></div>
-                            <h1 className="text-xl font-black text-[#065f46]">自律動起來</h1>
+                <div className="max-w-md mx-auto min-h-screen bg-[#f0fdf4] pb-32">
+                    <header className="p-6 flex justify-between items-center bg-white border-b-4 border-[#065f46] sticky top-0 z-10">
+                        <div className="flex items-center gap-2 text-[#065f46]">
+                            <Icon name="Zap" className="text-yellow-400" />
+                            <h1 className="text-xl font-black">自律動起來</h1>
                         </div>
-                        <div className="flex items-center space-x-3">
-                           <img src={user.photoURL} className="w-10 h-10 rounded-xl border-2 border-[#065f46]" />
-                        </div>
+                        <img src={user.photoURL} className="w-10 h-10 rounded-xl border-2 border-[#065f46]" />
                     </header>
 
                     <main className="p-6 space-y-6">
-                        {/* 統計區域 */}
-                        <div className="bg-white p-6 rounded-[2rem] neo-brutalism flex justify-between items-center">
-                            <h2 className="text-lg font-black text-[#065f46]">本週累計自律時間</h2>
-                            <div className="flex items-baseline space-x-1">
-                                <span className="text-3xl font-black text-[#33cc99]">120</span>
-                                <span className="text-xs font-black text-[#065f46]">min</span>
-                            </div>
-                        </div>
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-[2rem] border-4 border-[#065f46] neo-shadow">
+                                    <h2 className="text-sm font-black text-gray-400 uppercase">本週累計時間</h2>
+                                    <div className="text-4xl font-black text-[#065f46]">145 <span className="text-lg">min</span></div>
+                                </div>
 
-                        {/* 練功狀況 */}
-                        <div className="bg-white p-6 rounded-[2rem] neo-brutalism space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xl font-black text-[#065f46]">練功進度</span>
-                                <span className="text-sm font-black text-gray-400 text-[#065f46]">4 次/週</span>
-                            </div>
-                            <div className="flex justify-between">
-                                {['日','一','二','三','四','五','六'].map((d, i) => (
-                                    <div key={i} className="flex flex-col items-center">
-                                        <StatusIndicator active={i < 4} size={28} />
-                                        <span className="text-[10px] font-black mt-1 opacity-40">{d}</span>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-[#beff64] p-5 rounded-[1.5rem] border-4 border-[#065f46] neo-shadow-sm text-[#065f46]">
+                                        <Icon name="Flame" className="mb-2" />
+                                        <div className="font-black">練功 5 次</div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
+                                    <div className="bg-white p-5 rounded-[1.5rem] border-4 border-[#065f46] neo-shadow-sm text-[#065f46]">
+                                        <Icon name="Dumbbell" className="mb-2" />
+                                        <div className="font-black">運動 120m</div>
+                                    </div>
+                                </div>
 
-                        <button className="w-full bg-[#beff64] p-5 rounded-[2rem] neo-brutalism font-black text-[#065f46] flex items-center justify-center space-x-2 active-press">
-                            <Icon name="Plus" />
-                            <span className="text-lg">今日打卡</span>
-                        </button>
+                                <button onClick={() => setShowLogModal(true)} className="w-full bg-[#beff64] p-5 rounded-[2rem] border-4 border-[#065f46] font-black text-[#065f46] neo-shadow active-press flex items-center justify-center gap-2">
+                                    <Icon name="Plus" /> 今日打卡
+                                </button>
+                            </div>
+                        )}
+                        
+                        {/* 日曆與排行榜視圖可以依此類推放入 */}
                     </main>
 
-                    {/* Navbar */}
-                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-xl">
-                        <button className="p-4 bg-[#beff64] rounded-full border-2 border-[#065f46] text-[#065f46]"><Icon name="Calendar" /></button>
-                        <button className="p-4 opacity-30 text-[#065f46]"><Icon name="Trophy" /></button>
-                        <button className="p-4 opacity-30 text-[#065f46]"><Icon name="User" /></button>
-                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-30 text-[#065f46]"><Icon name="LogOut" /></button>
+                    {/* 底部導覽列 */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white border-4 border-[#065f46] rounded-full p-2 flex justify-around shadow-2xl z-20">
+                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-full ${activeTab === 'dashboard' ? 'bg-[#beff64]' : ''}`}><Icon name="LayoutGrid" /></button>
+                        <button onClick={() => setActiveTab('calendar')} className={`p-4 rounded-full ${activeTab === 'calendar' ? 'bg-[#beff64]' : ''}`}><Icon name="Calendar" /></button>
+                        <button onClick={() => setActiveTab('ranking')} className={`p-4 rounded-full ${activeTab === 'ranking' ? 'bg-[#beff64]' : ''}`}><Icon name="Trophy" /></button>
+                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-40"><Icon name="LogOut" /></button>
                     </nav>
                 </div>
             );
