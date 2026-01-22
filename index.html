@@ -1,161 +1,162 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>日系極簡自律打卡 App</title>
+  <meta charset="UTF-8">
+  <title>自律打卡 SPA</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script type="module" src="https://unpkg.com/lucide@0.258.0/dist/lucide.esm.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
-    /* 全局硬邊框 & 圓角 & 硬陰影 */
-    .card { border: 2px solid #065f46; border-radius: 1.5rem; box-shadow: 6px 6px 0px 0px #065f46; background:white; }
-    .status-circle { width:40px;height:40px;border-radius:9999px;display:flex;align-items:center;justify-content:center; }
-    .fixed-nav { position:fixed;bottom:32px;left:50%;transform:translateX(-50%);width:90%;display:flex;justify-content:space-between;background:white; border:2px solid #065f46; border-radius:1.5rem; box-shadow:6px 6px 0 #065f46; padding:0.5rem 1rem; }
-    .btn { border:2px solid #065f46; border-radius:1.5rem; box-shadow:6px 6px 0 #065f46; padding:0.5rem 1rem; text-align:center; font-weight:900; cursor:pointer; }
-    .btn:active { transform:translateY(2px); box-shadow:2px 2px 0 #065f46; }
+    .hard-shadow { box-shadow: 6px 6px 0 #065f46; }
+    .btn-press:active { transform: translateY(2px); box-shadow: 2px 2px 0 #065f46; }
+    .status-circle { width: 24px; height: 24px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .page { display:none; }
+    .active { display:block; }
   </style>
 </head>
 <body class="bg-white font-sans">
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-    import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-      authDomain: "actiongame-7c8c9.firebaseapp.com",
-      projectId: "actiongame-7c8c9",
-      storageBucket: "actiongame-7c8c9.appspot.com",
-      messagingSenderId: "386021872588",
-      appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-      measurementId: "G-W6CNY1D4RL"
-    };
-    const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-    const auth = getAuth();
-    const db = getDatabase(app);
+  <!-- Header -->
+  <header class="flex justify-between items-center p-4 border-b-2 border-[#065f46] hard-shadow">
+    <div class="font-bold text-[#065f46]">🏯 My Habit</div>
+    <div class="rounded-3xl w-10 h-10 bg-[#065f46] cursor-pointer"></div>
+  </header>
 
-    let currentUser = null;
-    let usersData = {};
+  <!-- Pages -->
+  <main class="p-4 space-y-4">
 
-    // 登入
-    async function login() {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      currentUser = result.user;
-      if (!usersData[currentUser.uid]) {
-        await set(ref(db, 'users/' + currentUser.uid), { name: currentUser.displayName, weeklyTotal:0, projects:{} });
-      }
-      showDashboard();
-    }
-
-    function logout() {
-      signOut(auth);
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      currentUser = user;
-      if (user) {
-        loadUsersData();
-      } else {
-        document.getElementById('app').innerHTML = `<div class="flex flex-col items-center justify-center h-screen gap-4">
-          <h1 class="text-3xl font-black text-[#065f46]">日系極簡自律打卡</h1>
-          <button class="btn bg-[#beff64]" onclick="login()">Google 登入</button>
-        </div>`;
-      }
-    });
-
-    function loadUsersData() {
-      const usersRef = ref(db, 'users');
-      onValue(usersRef, (snapshot) => {
-        usersData = snapshot.val() || {};
-        showDashboard();
-      });
-    }
-
-    // ===================== Dashboard =====================
-    function showDashboard() {
-      const projects = ['練功','五分鐘','運動','拉筋'];
-      const weekDays = ['日','一','二','三','四','五','六'];
-      const userData = usersData[currentUser.uid] || { weeklyTotal:0, projects:{} };
-      const todayIndex = new Date().getDay();
-
-      document.getElementById('app').innerHTML = `
-        <div class="flex flex-col gap-4 p-4">
-          <!-- Header -->
-          <div class="flex justify-between items-center">
-            <h2 class="text-xl font-black text-[#065f46]">Dashboard</h2>
-            <div class="card w-12 h-12 flex items-center justify-center cursor-pointer" onclick="showProfile()">
-              ${currentUser.displayName[0]}
-            </div>
-          </div>
-
-          <!-- 週累計 -->
-          <div class="card p-4 flex justify-between items-center text-2xl font-black text-[#FACC15]">
-            <span>本週累計</span>
-            <span id="weeklyTotal">${userData.weeklyTotal || 0} min</span>
-          </div>
-
-          <!-- 專案狀態 -->
-          ${projects.map(p=>{
-            const statusArr = userData.projects[p] || Array(7).fill(false);
-            return `<div class="card p-4 flex flex-col gap-2">
-              <div class="flex justify-between font-black text-[#065f46]">${p} <span>${statusArr.filter(s=>s).length} 次</span></div>
-              <div class="flex gap-2">
-                ${statusArr.map((s,i)=>`<div class="status-circle ${s?'bg-[#FACC15]':'bg-gray-200'}">${s?'😄':''}</div>`).join('')}
-              </div>
-            </div>`;
-          }).join('')}
-
-          <!-- 打卡按鈕 -->
-          <button class="btn w-full bg-[#beff64] text-xl mt-2" onclick="openLogModal()">+ 打卡</button>
-        </div>
-
-        <!-- Log Modal -->
-        <div id="logModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden">
-          <div class="card p-4 flex flex-col gap-4 w-3/4">
-            <h3 class="text-xl font-black text-[#065f46]">選擇專案打卡</h3>
-            ${projects.map(p=>`<button class="btn bg-white" onclick="logProject('${p}')">${p}</button>`).join('')}
-            <button class="btn bg-gray-200" onclick="closeLogModal()">取消</button>
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page active">
+      <div class="w-full p-4 border-2 border-[#065f46] rounded-3xl hard-shadow flex justify-between items-center">
+        <span class="font-black text-[#065f46]">本週累計</span>
+        <span class="font-black text-[#FACC15] text-xl">120 min</span>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow space-y-2">
+          <div class="font-bold text-[#065f46]">練功 (3/7)</div>
+          <div class="flex justify-between">
+            <div class="status-circle bg-[#FACC15]">😄</div>
+            <div class="status-circle bg-[#FACC15]">😄</div>
+            <div class="status-circle bg-[#FACC15]">😄</div>
+            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+            <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
           </div>
         </div>
+      </div>
+      <button id="logBtn" class="w-full p-4 bg-[#beff64] rounded-3xl font-black hard-shadow btn-press mt-4">+ 打卡</button>
+    </div>
 
-        <!-- Fixed Nav -->
-        <div class="fixed-nav">
-          <div onclick="showDashboard()" class="flex flex-col items-center"><i data-lucide="home"></i><span class="text-xs">首頁</span></div>
-          <div onclick="showCalendar()" class="flex flex-col items-center"><i data-lucide="calendar"></i><span class="text-xs">日曆</span></div>
-          <div onclick="showRanking()" class="flex flex-col items-center"><i data-lucide="award"></i><span class="text-xs">排行榜</span></div>
-          <div onclick="showProfile()" class="flex flex-col items-center"><i data-lucide="user"></i><span class="text-xs">個人</span></div>
+    <!-- Calendar -->
+    <div id="page-calendar" class="page p-4">
+      <div class="flex justify-between items-center mb-4">
+        <div class="font-bold text-[#065f46]">2026年1月</div>
+        <div class="flex space-x-2">
+          <button class="px-2 py-1 bg-[#FACC15] rounded-2xl text-[#065f46]">今日</button>
+          <button class="px-2 py-1 border-2 border-[#065f46] rounded-2xl text-[#065f46]">週/月切換</button>
         </div>
-      `;
+      </div>
+      <div class="grid grid-cols-7 gap-2">
+        <!-- 假設月份 7x5 -->
+        <div class="status-circle bg-[#FACC15]">😄</div>
+        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+        <div class="status-circle bg-[#FACC15]">😄</div>
+        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+        <div class="status-circle bg-[#FACC15]">😄</div>
+        <div class="status-circle bg-gray-200 border-2 border-dashed border-[#065f46]">😐</div>
+      </div>
+    </div>
+
+    <!-- Ranking -->
+    <div id="page-ranking" class="page p-4">
+      <div class="flex justify-around mb-4">
+        <div class="w-16 h-24 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
+          <span class="font-bold text-[#065f46]">2</span>
+          <span>小明</span>
+        </div>
+        <div class="w-16 h-32 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
+          <span class="font-bold text-[#065f46]">1</span>
+          <span>小華</span>
+        </div>
+        <div class="w-16 h-20 bg-[#beff64] rounded-xl flex flex-col justify-end items-center">
+          <span class="font-bold text-[#065f46]">3</span>
+          <span>小美</span>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between p-2 border-b border-gray-300">
+          <span>4</span><span>小李</span><span>80 min</span>
+        </div>
+        <div class="flex justify-between p-2 border-b border-gray-300">
+          <span>5</span><span>小王</span><span>75 min</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div id="page-profile" class="page p-4">
+      <div class="flex flex-col items-center space-y-2 mb-4">
+        <div class="w-20 h-20 bg-[#065f46] rounded-3xl"></div>
+        <div class="font-bold text-[#065f46]">我的名字</div>
+        <div class="text-[#FACC15] font-bold">本月統計</div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">練功<br>12次</div>
+        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">五分鐘<br>8次</div>
+        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">運動<br>50 min</div>
+        <div class="p-4 border-2 border-[#065f46] rounded-3xl hard-shadow text-center">拉筋<br>20 min</div>
+      </div>
+      <button class="w-full p-4 mt-4 bg-[#beff64] rounded-3xl font-black hard-shadow btn-press">登出</button>
+    </div>
+
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-11/12 bg-white border-2 border-[#065f46] rounded-3xl hard-shadow flex justify-around p-2">
+    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="dashboard">
+      <i data-lucide="home"></i>
+    </div>
+    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="calendar">
+      <i data-lucide="calendar"></i>
+    </div>
+    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="ranking">
+      <i data-lucide="award"></i>
+    </div>
+    <div class="nav-btn flex flex-col items-center cursor-pointer" data-target="profile">
+      <i data-lucide="user"></i>
+    </div>
+  </nav>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
-    }
 
-    // ===================== Log Modal =====================
-    function openLogModal() { document.getElementById('logModal').classList.remove('hidden'); }
-    function closeLogModal() { document.getElementById('logModal').classList.add('hidden'); }
+      // SPA 切換
+      const pages = {
+        dashboard: document.getElementById('page-dashboard'),
+        calendar: document.getElementById('page-calendar'),
+        ranking: document.getElementById('page-ranking'),
+        profile: document.getElementById('page-profile')
+      };
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.target;
+          for (const key in pages) pages[key].classList.remove('active');
+          pages[target].classList.add('active');
+        });
+      });
 
-    function logProject(projectName) {
-      const userRef = ref(db, 'users/' + currentUser.uid);
-      const todayIndex = new Date().getDay();
-      const userData = usersData[currentUser.uid] || { projects:{} };
-      if(!userData.projects[projectName]) userData.projects[projectName]=Array(7).fill(false);
-      userData.projects[projectName][todayIndex] = true;
-      userData.weeklyTotal = (userData.weeklyTotal || 0) + 5;
-      update(userRef, userData);
-      closeLogModal();
-      confetti({ particleCount: 100, colors: ['#beff64','#FACC15'] });
-    }
-
-    // ===================== Placeholder: Calendar / Ranking / Profile =====================
-    function showCalendar(){ alert('Calendar 模組待整合'); }
-    function showRanking(){ alert('Ranking 模組待整合'); }
-    function showProfile(){ alert('Profile 模組待整合'); }
+      // 打卡按鈕
+      document.getElementById("logBtn").addEventListener("click", () => {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#beff64', '#FACC15'] });
+        alert("打卡成功！");
+      });
+    });
   </script>
-
-  <div id="app" class="h-screen"></div>
 </body>
 </html>
