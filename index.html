@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自律動起來 - 日曆紀錄版</title>
+    <title>自律動起來 - 綜合進化版</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -12,23 +12,63 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
     <style type="text/tailwindcss">
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
         @layer utilities {
             .neo-border { @apply border-2 border-[#065f46]; }
+            .neo-border-thin { @apply border border-[#065f46]; }
             .neo-shadow { box-shadow: 6px 6px 0px 0px #065f46; }
             .neo-shadow-sm { box-shadow: 4px 4px 0px 0px #065f46; }
             .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
             .overlay-blur { backdrop-filter: blur(4px); background-color: rgba(6, 95, 70, 0.4); }
+            .jp-font { font-family: 'Dela Gothic One', cursive; font-weight: 900; }
+            
+            .float-anim { animation: float 4s ease-in-out infinite; }
+            @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+            
+            .shake-anim { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+            @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+
+            .glass-card {
+                background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+                position: relative;
+                overflow: hidden;
+            }
+            .wave-bg { position: absolute; bottom: -10px; right: -10px; opacity: 0.1; transform: rotate(-10deg); }
+            
+            .card-bg-warm { background-color: #fffbeb; }
+            .card-bg-active { background-color: #fde68a; }
+            .clean-select { appearance: none; background-image: none; }
         }
-        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f0fdf4] text-gray-800; }
+        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#fefce8] text-gray-800; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Firebase 配置 ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'discipline-app';
+
+        // --- 工具函數 ---
+        const formatDateKey = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
 
         const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
             const ref = useRef(null);
@@ -48,121 +88,271 @@
             return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
         };
 
-        const Calendar = () => {
-            const today = new Date();
-            const [currentMonth, setCurrentMonth] = useState(new Date());
-            
-            // 獲取該月天數與起始星期
-            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-            const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-            
-            // 模擬已打卡日期（例如 1, 5, 12, 18, 22 號）
-            const dummyLogDates = [1, 5, 12, 18, 22];
+        const CustomSmile = ({ size = 20, active = false, count = 0, label = "", offset = false }) => (
+            <div className="flex flex-col items-center">
+                <div 
+                    className={`rounded-full flex items-center justify-center transition-all ${active ? 'bg-yellow-400 neo-border-thin shadow-sm' : 'bg-transparent opacity-10'} ${offset ? 'mt-[1pt]' : ''}`} 
+                    style={{ width: size + 16, height: size + 16 }}
+                >
+                    <Icon name="Smile" size={size} className="text-[#065f46]" strokeWidth={2.5} />
+                </div>
+                {active && count > 0 && (
+                    <span className="text-[10px] font-black text-[#065f46] leading-none mt-1">
+                        {label || `x${count}`}
+                    </span>
+                )}
+            </div>
+        );
 
-            const days = [];
-            for (let i = 0; i < firstDayOfMonth; i++) days.push(null);
-            for (let d = 1; d <= daysInMonth; d++) days.push(d);
+        // --- 主程式 ---
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [dailyLogs, setDailyLogs] = useState({}); 
+            
+            // 用於追蹤「本次視窗開啟期間」已經點擊過的項目（防止單頁重複打卡）
+            const [sessionClicked, setSessionClicked] = useState({
+                practice: false,
+                fiveMin: false,
+                exercise: false,
+                stretch: false
+            });
+            
+            const todayKey = useMemo(() => formatDateKey(new Date()), []);
+            
+            const [inputState, setInputState] = useState({
+                practice: 0,
+                fiveMin: 0,
+                exerciseTime: 0,
+                stretchTime: 0,
+                exerciseCount: 0,
+                stretchCount: 0
+            });
 
-            const changeMonth = (offset) => {
-                setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+            useEffect(() => {
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await auth.signInWithCustomToken(__initial_auth_token);
+                    } else {
+                        await auth.signInAnonymously();
+                    }
+                };
+                initAuth();
+                const unsubscribe = auth.onAuthStateChanged(u => setUser(u));
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const logsCol = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('dailyLogs');
+                
+                const unsubscribe = logsCol.onSnapshot((snapshot) => {
+                    const logs = {};
+                    snapshot.forEach(doc => { logs[doc.id] = doc.data(); });
+                    setDailyLogs(logs);
+                    
+                    if (logs[todayKey]) {
+                        setInputState({
+                            practice: Number(logs[todayKey].practice) || 0,
+                            fiveMin: Number(logs[todayKey].fiveMin) || 0,
+                            exerciseTime: Number(logs[todayKey].exerciseTime) || 0,
+                            stretchTime: Number(logs[todayKey].stretchTime) || 0,
+                            exerciseCount: Number(logs[todayKey].exerciseCount) || 0,
+                            stretchCount: Number(logs[todayKey].stretchCount) || 0
+                        });
+                    } else {
+                        // 如果今天沒資料，重設 local state
+                        setInputState({ practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0, exerciseCount: 0, stretchCount: 0 });
+                    }
+                });
+                return () => unsubscribe();
+            }, [user, todayKey]);
+
+            const stats = useMemo(() => {
+                const now = new Date();
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+                startOfWeek.setHours(0,0,0,0);
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                let weekPractice = 0;
+                let weekFiveMin = 0;
+                let weekExerciseMins = 0;
+                let weekTotalActions = 0; 
+                let monthTotalDays = 0;
+
+                Object.entries(dailyLogs).forEach(([dateStr, data]) => {
+                    const date = new Date(dateStr);
+                    const p = Number(data.practice) || 0;
+                    const f = Number(data.fiveMin) || 0;
+                    const eT = Number(data.exerciseTime) || 0;
+                    const sT = Number(data.stretchTime) || 0;
+                    const eC = Number(data.exerciseCount) || 0;
+                    const sC = Number(data.stretchCount) || 0;
+
+                    if (date >= startOfWeek) {
+                        weekPractice += p;
+                        weekFiveMin += f;
+                        weekExerciseMins += (eT + sT);
+                        weekTotalActions += (p + f + eC + sC);
+                    }
+                    if (date >= startOfMonth && (p > 0 || f > 0 || eT > 0 || sT > 0)) {
+                        monthTotalDays++;
+                    }
+                });
+                return { weekPractice, weekFiveMin, weekExerciseMins, weekTotalActions, monthTotalDays };
+            }, [dailyLogs]);
+
+            const handleAccumulate = async (type, payload) => {
+                if (!user) return;
+                
+                // 檢查本次視窗是否已點過
+                const sessionKey = type === 'simple' ? payload : (payload.key === 'exerciseTime' ? 'exercise' : 'stretch');
+                if (sessionClicked[sessionKey]) return;
+
+                let updates = {};
+                if (type === 'simple') {
+                    updates[payload] = (inputState[payload] || 0) + 1;
+                } else if (type === 'time') {
+                    const { key, mins } = payload;
+                    const countKey = key.replace('Time', 'Count');
+                    updates[key] = (inputState[key] || 0) + Number(mins);
+                    updates[countKey] = (inputState[countKey] || 0) + 1;
+                }
+
+                setSessionClicked(prev => ({ ...prev, [sessionKey]: true }));
+
+                window.confetti({ 
+                    particleCount: 100, 
+                    spread: 70, 
+                    origin: { y: 0.6 }, 
+                    colors: ['#065f46', '#fde68a', '#ffffff'] 
+                });
+
+                await db.collection('artifacts').doc(appId)
+                    .collection('users').doc(user.uid)
+                    .collection('dailyLogs').doc(todayKey)
+                    .set(updates, { merge: true });
+            };
+
+            const handleResetToday = async () => {
+                if (!user) return;
+                const confirmReset = window.confirm("確定要清空今天的打卡紀錄並重新計算嗎？");
+                if (confirmReset) {
+                    await db.collection('artifacts').doc(appId)
+                        .collection('users').doc(user.uid)
+                        .collection('dailyLogs').doc(todayKey)
+                        .delete();
+                    setSessionClicked({ practice: false, fiveMin: false, exercise: false, stretch: false });
+                }
+            };
+
+            const openModal = () => {
+                setSessionClicked({ practice: false, fiveMin: false, exercise: false, stretch: false });
+                setIsModalOpen(true);
             };
 
             return (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow">
-                        <div className="flex justify-between items-center mb-6">
-                            <button onClick={() => changeMonth(-1)} className="p-2 neo-border rounded-xl active-press"><Icon name="ChevronLeft" /></button>
-                            <h2 className="text-2xl font-black text-[#065f46]">
-                                {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
-                            </h2>
-                            <button onClick={() => changeMonth(1)} className="p-2 neo-border rounded-xl active-press"><Icon name="ChevronRight" /></button>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2">
-                            {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-                                <div key={d} className="text-center font-black text-[#065f46] opacity-40 text-xs py-2">{d}</div>
-                            ))}
-                            {days.map((day, idx) => {
-                                const isLogged = dummyLogDates.includes(day);
-                                const isToday = day === today.getDate() && currentMonth.getMonth() === today.getMonth();
-                                
-                                return (
-                                    <div 
-                                        key={idx} 
-                                        className={`aspect-square rounded-xl neo-border flex flex-col items-center justify-center relative transition-all
-                                            ${day === null ? 'border-none' : ''}
-                                            ${isLogged ? 'bg-[#beff64] neo-shadow-sm' : 'bg-white'}
-                                            ${isToday ? 'ring-4 ring-[#065f46] ring-inset' : ''}
-                                        `}
-                                    >
-                                        {day && (
-                                            <>
-                                                <span className={`text-sm font-black ${isLogged ? 'text-[#065f46]' : 'text-gray-400'}`}>{day}</span>
-                                                {isLogged && <Icon name="Smile" size={14} className="mt-1 text-[#065f46]" />}
-                                            </>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="bg-[#beff64] p-6 rounded-[2rem] neo-border neo-shadow-sm">
-                        <h3 className="font-black text-[#065f46]">本月自律統計</h3>
-                        <div className="flex justify-between mt-4">
-                            <div className="text-center">
-                                <div className="text-2xl font-black text-[#065f46]">15</div>
-                                <div className="text-[10px] font-bold opacity-60">打卡天數</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-black text-[#065f46]">85%</div>
-                                <div className="text-[10px] font-bold opacity-60">完成率</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-black text-[#065f46]">5</div>
-                                <div className="text-[10px] font-bold opacity-60">連續紀錄</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [user] = useState({ displayName: "自律者", photoURL: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" });
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [isModalOpen, setIsModalOpen] = useState(false);
-
-            return (
-                <div className="max-w-md mx-auto min-h-screen bg-[#f0fdf4] relative pb-32">
-                    <header className="bg-white px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0">
+                <div className="max-w-md mx-auto min-h-screen bg-[#fefce8] relative pb-32">
+                    <header className="bg-white/90 backdrop-blur-md sticky top-0 px-6 py-5 flex justify-between items-center neo-border border-t-0 border-x-0 z-30">
                         <div className="flex items-center space-x-2 text-[#065f46]">
-                            <Icon name="Smile" size={28} />
-                            <span className="text-xl font-black uppercase">Self-Discipline</span>
+                            <div className="bg-yellow-400 p-1.5 rounded-lg neo-border-thin shadow-sm"><Icon name="Zap" size={20} /></div>
+                            <span className="jp-font text-xl tracking-tight">自律動起來</span>
                         </div>
-                        <img src={user.photoURL} className="w-10 h-10 rounded-xl neo-border" />
+                        <div onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-full neo-border bg-yellow-400 flex items-center justify-center cursor-pointer active-press"><Icon name="User" size={20} /></div>
                     </header>
 
                     <main className="p-6">
-                        {activeTab === 'dashboard' ? (
-                            /* 原本的首頁內容... (簡略顯示) */
-                            <div className="space-y-4">
-                                <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow-sm">
-                                    <h2 className="text-xl font-black text-[#065f46]">你好，{user.displayName}</h2>
-                                    <p className="text-gray-400 font-bold text-sm">點擊下方按鈕開始打卡！</p>
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-5">
+                                <div className="glass-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim">
+                                    <div className="relative z-10 flex justify-between items-start">
+                                        <div>
+                                            <h2 className="jp-font text-2xl text-[#065f46] mb-1">早安，自律君！</h2>
+                                            <p className="text-gray-500 font-bold text-xs leading-relaxed max-w-[180px]">本月已堅持 {stats.monthTotalDays} 天，繼續保持！✨</p>
+                                        </div>
+                                        <div className="bg-white/70 p-4 rounded-3xl neo-border-thin backdrop-blur-sm text-center">
+                                            <div className="jp-font text-[#065f46] text-2xl">{Math.min(100, stats.weekTotalActions * 5)}%</div>
+                                            <div className="text-[9px] text-gray-400 font-bold">本週進度</div>
+                                        </div>
+                                    </div>
+                                    <Icon name="Sparkles" size={80} className="wave-bg text-[#fde68a]" />
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="w-full bg-[#beff64] p-6 rounded-[2rem] neo-border neo-shadow active-press flex items-center justify-center gap-3">
-                                    <Icon name="Zap" /> <span className="font-black text-[#065f46] text-xl">＋ 今日打卡</span>
+
+                                <div className="bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow-sm flex justify-between items-center active-press">
+                                    <div>
+                                        <h3 className="jp-font text-[#065f46] text-lg">本週累計運動</h3>
+                                        <div className="jp-font text-3xl text-[#065f46] mt-1">{stats.weekExerciseMins} <span className="text-sm">分鐘</span></div>
+                                    </div>
+                                    <div className="w-14 h-14 bg-white rounded-2xl neo-border flex items-center justify-center">
+                                        <Icon name="Clock" size={32} className="text-[#065f46]" />
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
+                                    <h3 className="jp-font text-[#065f46] mb-1">練功 <span className="text-2xl ml-1">{stats.weekPractice}</span> 次/週</h3>
+                                    <ProgressDots current={stats.weekPractice} />
+                                </div>
+
+                                <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow-sm">
+                                    <h3 className="jp-font text-[#065f46] mb-1">五分鐘 <span className="text-2xl ml-1">{stats.weekFiveMin}</span> 次/週</h3>
+                                    <ProgressDots current={stats.weekFiveMin} />
+                                </div>
+
+                                <button onClick={openModal} className="w-full bg-[#fde68a] p-6 rounded-[2.5rem] neo-border neo-shadow active-press flex items-center justify-center gap-3">
+                                    <Icon name="PlusCircle" size={28} className="text-[#065f46]" />
+                                    <span className="jp-font text-[#065f46] text-xl">今日打卡</span>
                                 </button>
                             </div>
-                        ) : activeTab === 'calendar' ? (
-                            <Calendar />
-                        ) : (
-                            <div className="text-center py-20 font-black text-[#065f46] opacity-20 text-3xl italic">COMING SOON</div>
                         )}
+
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
+                        {activeTab === 'profile' && <ProfileView stats={stats} userId={user?.uid} onReset={handleResetToday} />}
                     </main>
 
-                    {/* 這裡省略了打卡彈窗與導覽按鈕的重複部分，實際程式碼中請保留 */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 overlay-blur">
+                            <div className="w-full max-w-md bg-white rounded-[3.5rem] neo-border neo-shadow p-8 animate-in zoom-in-95 duration-200 relative">
+                                <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-8 p-2 bg-gray-50 rounded-full active-press"><Icon name="X" size={16} /></button>
+                                <h3 className="jp-font text-2xl text-[#065f46] text-center mb-8">打卡紀錄</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <AccumulateCard 
+                                        label="練功" 
+                                        count={inputState.practice} 
+                                        sessionDone={sessionClicked.practice}
+                                        onIncrement={() => handleAccumulate('simple', 'practice')} 
+                                    />
+                                    <AccumulateCard 
+                                        label="五分鐘" 
+                                        count={inputState.fiveMin} 
+                                        sessionDone={sessionClicked.fiveMin}
+                                        onIncrement={() => handleAccumulate('simple', 'fiveMin')} 
+                                    />
+                                    <TimeAccumulateCard 
+                                        label="運動" 
+                                        totalMins={inputState.exerciseTime} 
+                                        sessionDone={sessionClicked.exercise}
+                                        onIncrement={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} 
+                                    />
+                                    <TimeAccumulateCard 
+                                        label="拉筋" 
+                                        totalMins={inputState.stretchTime} 
+                                        sessionDone={sessionClicked.stretch}
+                                        onIncrement={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} 
+                                    />
+                                </div>
+                                
+                                <div className="mt-8 space-y-3">
+                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 bg-[#065f46] text-[#fde68a] rounded-2xl jp-font active-press">完成</button>
+                                    <button onClick={handleResetToday} className="w-full py-2 text-gray-400 text-xs jp-font hover:text-red-500 transition-colors flex items-center justify-center gap-1">
+                                        <Icon name="RefreshCcw" size={12} /> 重計今日打卡
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white neo-border rounded-full p-2 flex justify-around neo-shadow z-20">
                         <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="LayoutGrid" />
                         <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Calendar" />
@@ -173,10 +363,170 @@
             );
         };
 
+        const ProgressDots = ({ current, total = 7 }) => (
+            <div className="flex justify-between gap-1 mt-3">
+                {[...Array(total)].map((_, i) => (
+                    <div key={i} className={`w-8 h-8 rounded-full neo-border flex items-center justify-center ${i < current ? 'bg-yellow-400' : 'bg-gray-50'}`}>
+                        <Icon name="Smile" size={16} className={i < current ? 'text-[#065f46]' : 'text-gray-100'} />
+                    </div>
+                ))}
+            </div>
+        );
+
+        const AccumulateCard = ({ label, count, sessionDone, onIncrement }) => (
+            <div 
+                onClick={onIncrement} 
+                className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2.5rem] neo-border transition-all active-press cursor-pointer relative ${count > 0 && !sessionDone ? 'card-bg-active' : 'card-bg-warm'}`}
+            >
+                <span className="jp-font text-[#065f46] text-[24pt] leading-none mb-2">{label}</span>
+                <CustomSmile size={24} active={count > 0} count={count} offset={true} />
+            </div>
+        );
+
+        const TimeAccumulateCard = ({ label, totalMins, sessionDone, onIncrement }) => {
+            const [mins, setMins] = useState(''); 
+            const [isShaking, setIsShaking] = useState(false);
+
+            const handleCardClick = () => {
+                if (sessionDone) return;
+                if (!mins) {
+                    setIsShaking(true);
+                    setTimeout(() => setIsShaking(false), 500);
+                    return;
+                }
+                onIncrement(mins);
+            };
+
+            return (
+                <div 
+                    onClick={handleCardClick}
+                    className={`aspect-square flex flex-col items-center justify-between py-6 px-3 rounded-[2.5rem] neo-border transition-all relative cursor-pointer active-press ${totalMins > 0 && !sessionDone ? 'card-bg-active' : 'card-bg-warm'} ${isShaking ? 'shake-anim border-red-500' : ''}`}
+                >
+                    <div className="flex-1 flex items-center justify-center w-full">
+                        <span className="jp-font text-[#065f46] text-[24pt] leading-none">{label}</span>
+                    </div>
+                    <select 
+                        disabled={sessionDone}
+                        value={mins} 
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setMins(e.target.value)} 
+                        className={`w-full py-1.5 px-2 bg-white/80 neo-border-thin rounded-full text-[12px] jp-font text-[#065f46] focus:outline-none clean-select text-center ${isShaking ? 'border-red-400' : ''} ${sessionDone ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <option value="">+分鐘</option>
+                        {[5,10,15,30,45,60].map(m => <option key={m} value={m}>+{m}分</option>)}
+                    </select>
+                    <div className="absolute -top-1 -right-1">
+                        <CustomSmile size={18} active={totalMins > 0} count={totalMins} label={`${totalMins}m`} />
+                    </div>
+                </div>
+            );
+        };
+
+        const CalendarView = ({ dailyLogs }) => {
+            const [viewMode, setViewMode] = useState('week');
+            const [viewDate, setViewDate] = useState(new Date());
+            const year = viewDate.getFullYear();
+            const month = viewDate.getMonth();
+            
+            const monthDays = useMemo(() => {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay();
+                const days = [];
+                for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) days.push(null);
+                for (let d = 1; d <= daysInMonth; d++) days.push(d);
+                return days;
+            }, [year, month]);
+
+            const weekDays = useMemo(() => {
+                const start = new Date(viewDate);
+                const day = start.getDay();
+                const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+                start.setDate(diff);
+                return Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(start);
+                    d.setDate(start.getDate() + i);
+                    return d;
+                });
+            }, [viewDate]);
+
+            return (
+                <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="flex bg-white rounded-2xl neo-border p-1">
+                        <button onClick={() => setViewMode('week')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'week' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>週</button>
+                        <button onClick={() => setViewMode('month')} className={`flex-1 py-2 rounded-xl jp-font transition-all ${viewMode === 'month' ? 'bg-yellow-400 text-[#065f46]' : 'text-gray-300'}`}>月</button>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow">
+                        <div className="flex justify-between items-center mb-6">
+                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()-7) : d.setMonth(d.getMonth()-1); setViewDate(d); }}><Icon name="ChevronLeft" /></button>
+                            <h2 className="jp-font text-[#065f46] text-xl">{year}年 {month + 1}月</h2>
+                            <button onClick={() => { const d = new Date(viewDate); viewMode === 'week' ? d.setDate(d.getDate()+7) : d.setMonth(d.getMonth()+1); setViewDate(d); }}><Icon name="ChevronRight" /></button>
+                        </div>
+                        {viewMode === 'month' ? (
+                            <div className="grid grid-cols-7 gap-y-4">
+                                {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-center text-[10px] jp-font text-gray-300">{d}</div>)}
+                                {monthDays.map((day, i) => {
+                                    if (!day) return <div key={`empty-${i}`} />;
+                                    const dKey = formatDateKey(new Date(year, month, day));
+                                    const log = dailyLogs[dKey];
+                                    const isDone = log && (log.practice > 0 || log.exerciseTime > 0 || log.stretchTime > 0 || log.fiveMin > 0);
+                                    return (
+                                        <div key={day} className="flex flex-col items-center">
+                                            <div className={`w-8 h-8 flex items-center justify-center rounded-full jp-font text-xs ${isDone ? 'bg-yellow-400 neo-border-thin' : 'text-gray-400'}`}>{day}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {weekDays.map((date, i) => {
+                                    const dKey = formatDateKey(date);
+                                    const log = dailyLogs[dKey];
+                                    const isDone = log && (log.practice > 0 || log.exerciseTime > 0 || log.stretchTime > 0 || log.fiveMin > 0);
+                                    return (
+                                        <div key={i} className={`flex justify-between items-center p-4 rounded-2xl neo-border-thin ${date.toDateString() === new Date().toDateString() ? 'bg-[#fffbeb]' : ''}`}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-center min-w-[40px]">
+                                                    <div className="text-[10px] text-gray-400 jp-font">{['一','二','三','四','五','六','日'][i]}</div>
+                                                    <div className="jp-font text-[#065f46]">{date.getDate()}</div>
+                                                </div>
+                                                <div className="jp-font text-[#065f46] text-sm">{isDone ? "今日已達成！" : "尚未紀錄"}</div>
+                                            </div>
+                                            <CustomSmile size={18} active={isDone} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const ProfileView = ({ stats, userId, onReset }) => (
+            <div className="space-y-6 text-center">
+                <div className="w-24 h-24 rounded-full bg-yellow-400 neo-border flex items-center justify-center mx-auto mb-4"><Icon name="User" size={56} className="text-[#065f46]" /></div>
+                <h2 className="jp-font text-2xl text-[#065f46]">自律小英雄</h2>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white p-5 rounded-3xl neo-border">
+                        <div className="jp-font text-3xl text-[#065f46]">{stats.monthTotalDays}</div>
+                        <div className="text-xs text-gray-400 font-bold">本月堅持(天)</div>
+                    </div>
+                    <div className="bg-white p-5 rounded-3xl neo-border">
+                        <div className="jp-font text-3xl text-[#065f46]">{stats.weekTotalActions}</div>
+                        <div className="text-xs text-gray-400 font-bold">本週打卡次數</div>
+                    </div>
+                </div>
+                <div className="pt-8">
+                    <button onClick={onReset} className="px-6 py-2 rounded-xl border border-gray-200 text-gray-400 text-xs jp-font active-press flex items-center gap-2 mx-auto">
+                        <Icon name="Trash2" size={14} /> 清空今日紀錄 (重計)
+                    </button>
+                </div>
+            </div>
+        );
+
         const NavBtn = ({ active, onClick, icon }) => (
-            <button onClick={onClick} className={`p-4 rounded-full transition-all ${active ? 'bg-[#beff64] neo-border' : 'opacity-20'}`}>
-                <Icon name={icon} size={24} className="text-[#065f46]" />
-            </button>
+            <button onClick={onClick} className={`p-4 rounded-full transition-all ${active ? 'bg-yellow-400 neo-border' : 'opacity-20'}`}><Icon name={icon} size={24} className="text-[#065f46]" /></button>
         );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
