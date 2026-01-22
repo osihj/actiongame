@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自律動起來 - 運動紀錄</title>
-    
+    <title>自律動起來</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -15,26 +14,17 @@
     {
       "imports": {
         "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
       }
     }
     </script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; margin: 0; }
-        .animate-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
 </head>
-<body>
+<body class="bg-gray-50">
     <div id="root"></div>
 
     <script type="module">
         import { initializeApp } from "firebase/app";
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-        import { getFirestore } from "firebase/firestore";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
@@ -42,112 +32,90 @@
             projectId: "actiongame-7c8c9",
             storageBucket: "actiongame-7c8c9.firebasestorage.app",
             messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-            measurementId: "G-W6CNY1D4RL"
+            appId: "1:386021872588:web:eb6019fa0a182d3aec4369"
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
-
-        // 將工具掛載到 window 供 React 使用
-        window.fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged };
+        window.fb = { auth, provider: new GoogleAuthProvider(), signInWithPopup, signOut, onAuthStateChanged };
     </script>
 
     <script type="text/babel">
-        const { Calendar, Trophy, LogOut, ChevronLeft, ChevronRight, LayoutGrid, Rows, Flame, LogIn } = lucide;
         const JAPAN_TEAL = "#065f46";
+
+        // 安全地渲染 Lucide 圖示的輔助組件
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const [iconHtml, setIconHtml] = React.useState("");
+            
+            React.useEffect(() => {
+                // 使用 lucide.createIcons 或直接產生 svg
+                if (window.lucide && window.lucide.icons[name]) {
+                    const svg = window.lucide.createIcons({
+                        icons: { [name]: window.lucide.icons[name] },
+                        attrs: { width: size, height: size, class: className }
+                    });
+                }
+            }, [name]);
+
+            // 為了極速修復，我們改用更直接的方式：將 Lucide 當作普通組件使用前先確認存在
+            const LucideIcon = window.lucide ? window.lucide[name] : null;
+            if (!LucideIcon) return <span className="w-6 h-6 bg-gray-200 block"></span>;
+            return <LucideIcon size={size} className={className} />;
+        };
 
         function App() {
             const [user, setUser] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
-            const [activeTab, setActiveTab] = React.useState('calendar');
-            const [selectedDate, setSelectedDate] = React.useState(new Date());
 
-            // 監聽登入狀態
             React.useEffect(() => {
-                const checkAuth = setInterval(() => {
+                const timer = setInterval(() => {
                     if (window.fb && window.fb.onAuthStateChanged) {
-                        const unsubscribe = window.fb.onAuthStateChanged(window.fb.auth, (currentUser) => {
-                            setUser(currentUser);
+                        window.fb.onAuthStateChanged(window.fb.auth, (u) => {
+                            setUser(u);
                             setLoading(false);
                         });
-                        clearInterval(checkAuth);
+                        clearInterval(timer);
                     }
-                }, 100);
+                }, 500);
             }, []);
 
-            const handleLogin = async () => {
-                try {
-                    await window.fb.signInWithPopup(window.fb.auth, window.fb.provider);
-                } catch (error) {
-                    console.error("登入錯誤:", error);
-                    alert("登入失敗！請檢查 Firebase 授權網域是否包含 osihj.github.io");
-                }
-            };
-
-            if (loading) return <div className="flex h-screen items-center justify-center font-bold text-emerald-800">載入中...</div>;
+            if (loading) return <div className="flex h-screen items-center justify-center font-bold">系統載入中...</div>;
 
             if (!user) {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#f0fdf4]">
-                        <div className="bg-white p-10 rounded-[3rem] border-4 text-center shadow-xl border-[#065f46] animate-in">
-                            <h1 className="text-4xl font-black mb-6 text-[#065f46]">自律動起來</h1>
-                            <p className="text-gray-500 mb-8 font-bold">開啟你的運動紀錄生活</p>
-                            <button onClick={handleLogin} className="flex items-center space-x-3 bg-[#beff64] border-2 px-8 py-4 rounded-2xl font-black text-xl border-[#065f46] text-[#065f46] active:scale-95 transition-all">
-                                <LogIn size="24" />
-                                <span>Google 登入</span>
-                            </button>
-                        </div>
+                    <div className="flex flex-col items-center justify-center min-h-screen">
+                        <h1 className="text-3xl font-black mb-6 text-[#065f46]">自律動起來</h1>
+                        <button 
+                            onClick={() => window.fb.signInWithPopup(window.fb.auth, window.fb.provider)}
+                            className="bg-[#beff64] border-4 border-[#065f46] px-8 py-4 rounded-2xl font-black flex items-center space-x-2"
+                        >
+                            <Icon name="LogIn" />
+                            <span>Google 登入</span>
+                        </button>
                     </div>
                 );
             }
 
             return (
-                <div className="max-w-md mx-auto min-h-screen pb-32 pt-6 px-4 animate-in">
-                    {/* 個人資料欄位 */}
-                    <div className="flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] border-2 border-[#065f46] shadow-sm">
+                <div className="max-w-md mx-auto p-4">
+                    <div className="flex items-center justify-between bg-white p-4 rounded-3xl border-2 border-[#065f46]">
                         <div className="flex items-center space-x-3">
-                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" alt="Avatar" />
-                            <div className="overflow-hidden">
-                                <div className="text-[10px] text-gray-400 font-bold uppercase">MEMBER</div>
-                                <div className="font-black text-[#065f46] truncate w-32">{user.displayName}</div>
-                            </div>
+                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-[#065f46]" />
+                            <span className="font-black">{user.displayName}</span>
                         </div>
-                        <div className="bg-[#beff64] px-3 py-1.5 rounded-xl border-2 border-[#065f46] flex items-center space-x-1">
-                            <Flame size="16" fill="#065f46" />
-                            <span className="font-black text-sm text-[#065f46]">12 Day</span>
-                        </div>
+                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="text-red-500">
+                            <Icon name="LogOut" />
+                        </button>
+                    </div>
+                    
+                    <div className="mt-8 bg-white p-6 rounded-3xl border-2 border-[#065f46] shadow-[8px_8px_0px_0px_#065f46]">
+                        <h2 className="text-xl font-black mb-4">歡迎回來！</h2>
+                        <p className="text-gray-500">今天也要記得運動喔 🏃‍♂️</p>
                     </div>
 
-                    {/* 日曆區塊 */}
-                    <div className="bg-white rounded-[2rem] p-6 border-2 border-[#065f46] shadow-[8px_8px_0px_0px_#065f46]">
-                        <div className="flex justify-between items-center mb-6">
-                            <button className="p-2 border-2 rounded-lg border-[#065f46]" onClick={() => {
-                                const d = new Date(selectedDate); d.setMonth(d.getMonth() - 1); setSelectedDate(d);
-                            }}><ChevronLeft size="18" /></button>
-                            <span className="font-black text-[#065f46] text-lg">{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月</span>
-                            <button className="p-2 border-2 rounded-lg border-[#065f46]" onClick={() => {
-                                const d = new Date(selectedDate); d.setMonth(d.getMonth() + 1); setSelectedDate(d);
-                            }}><ChevronRight size="18" /></button>
-                        </div>
-                        
-                        <div className="grid grid-cols-7 text-center font-black text-gray-300 text-sm mb-4">
-                            {['日','一','二','三','四','五','六'].map(d => <div key={d}>{d}</div>)}
-                        </div>
-                        <div className="grid grid-cols-7 text-center">
-                            {Array.from({length: 31}, (_, i) => i + 1).map(day => (
-                                <div key={day} className="h-10 flex items-center justify-center font-bold text-gray-600">{day}</div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 底部導航 */}
-                    <nav className="fixed bottom-6 left-6 right-6 max-w-md mx-auto bg-white border-4 border-[#065f46] rounded-[2.5rem] p-2 flex justify-around shadow-2xl z-50">
-                        <button onClick={() => setActiveTab('calendar')} className={`p-4 ${activeTab === 'calendar' ? 'text-[#065f46]' : 'opacity-30'}`}><Calendar size="24" /></button>
-                        <button onClick={() => setActiveTab('ranking')} className={`p-4 ${activeTab === 'ranking' ? 'text-[#065f46]' : 'opacity-30'}`}><Trophy size="24" /></button>
-                        <button onClick={() => window.fb.signOut(window.fb.auth)} className="p-4 opacity-30 text-red-600"><LogOut size="24" /></button>
+                    <nav className="fixed bottom-6 left-6 right-6 flex justify-around bg-white p-4 rounded-full border-4 border-[#065f46] shadow-xl">
+                        <Icon name="Calendar" className="text-[#065f46]" />
+                        <Icon name="Trophy" className="opacity-30" />
                     </nav>
                 </div>
             );
