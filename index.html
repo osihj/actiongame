@@ -101,7 +101,6 @@
     color:var(--ink);cursor:pointer;white-space:nowrap;font-weight:600;}
   .ed-list-option:hover{background:var(--bg);}
   .ed-list-option .chk{font-size:14px;color:var(--green);visibility:hidden;flex-shrink:0;}
-  .ed-list-option i.ti-list{color:var(--ink);}
   .editor-body{min-height:110px;max-height:320px;overflow-y:auto;padding:10px 12px;font-size:14px;
     line-height:1.7;background:var(--bg);outline:none;}
   .editor-body[contenteditable]:empty:before{content:attr(data-placeholder);color:var(--muted);}
@@ -331,7 +330,7 @@
         <div class="ed-list-dropdown" id="diary-list-dropdown">
           <button type="button" class="ed-btn" onmousedown="event.preventDefault()" onclick="diaryToggleListMenu(event)"><i class="ti ti-list"></i></button>
           <div class="ed-list-menu" id="diary-list-menu">
-            <div class="ed-list-option" data-type="ul" onmousedown="event.preventDefault()" onclick="diaryApplyList('ul')"><i class="ti ti-check chk"></i><i class="ti ti-list" style="font-size:16px;"></i></div>
+            <div class="ed-list-option" data-type="ul" onmousedown="event.preventDefault()" onclick="diaryApplyList('ul')"><i class="ti ti-check chk"></i>・・・</div>
             <div class="ed-list-option" data-type="ol" data-style="decimal" onmousedown="event.preventDefault()" onclick="diaryApplyList('ol','decimal')"><i class="ti ti-check chk"></i>1. 2. 3.</div>
             <div class="ed-list-option" data-type="ol" data-style="lower-alpha" onmousedown="event.preventDefault()" onclick="diaryApplyList('ol','lower-alpha')"><i class="ti ti-check chk"></i>a. b. c.</div>
             <div class="ed-list-option" data-type="ol" data-style="lower-roman" onmousedown="event.preventDefault()" onclick="diaryApplyList('ol','lower-roman')"><i class="ti ti-check chk"></i>i. ii. iii.</div>
@@ -348,6 +347,7 @@
 <section class="page" data-page="diary-all">
   <p class="eyebrow">DIARY</p>
   <h2 class="title">所有日記</h2>
+  <div class="chip-picker" id="diary-year-picker" style="margin-bottom:14px;"></div>
   <div class="card"><div id="diary-list"></div></div>
 </section>
 
@@ -498,6 +498,9 @@ let selectedRecipeCategory = recipeCategories[0];
 let selectedRecipeTags = [];
 let editingDiaryId = null;
 let editingRecipeId = null;
+let selectedDiaryYear = 'all';
+
+function pickDiaryYear(y){ selectedDiaryYear = y; renderAll(); }
 
 function pickDiaryCategory(c){ selectedDiaryCategory = c; renderAll(); }
 function toggleDiaryTag(t){
@@ -710,14 +713,26 @@ function addNote(){
 function filterTag(cat){ selectedTag = (selectedTag===cat) ? null : cat; renderAll(); }
 
 // ---------- 日記富文字編輯器（B / I / H / 項目清單・編號清單）----------
-function diaryExec(cmd){
+function ensureDiarySelection(){
   const editor = document.getElementById('diary-content');
   editor.focus();
+  const sel = window.getSelection();
+  const inEditor = sel.rangeCount && editor.contains(sel.getRangeAt(0).startContainer);
+  if(!inEditor){
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+function diaryExec(cmd){
+  ensureDiarySelection();
   if(cmd==='bold') document.execCommand('bold');
   else if(cmd==='italic') document.execCommand('italic');
   else if(cmd==='heading'){
-    const cur = (document.queryCommandValue('formatBlock')||'').toLowerCase();
-    document.execCommand('formatBlock', false, cur==='h3' ? 'p' : 'h3');
+    const cur = (document.queryCommandValue('formatBlock')||'').toLowerCase().replace(/[<>]/g,'');
+    document.execCommand('formatBlock', false, cur==='h3' ? '<p>' : '<h3>');
   }
 }
 function getDiaryListEl(){
@@ -763,8 +778,7 @@ function diaryToggleListMenu(e){
   }
 }
 function diaryApplyList(type, style){
-  const editor = document.getElementById('diary-content');
-  editor.focus();
+  ensureDiarySelection();
   if(type==='ul'){
     document.execCommand('insertUnorderedList');
   } else {
@@ -1160,7 +1174,16 @@ function renderAll(){
   document.getElementById('diary-tags-picker').innerHTML = diaryTags.map(t=>`
     <span class="chip ${selectedDiaryTags.includes(t)?'sel':''}" onclick="toggleDiaryTag('${t}')">${t}</span>`).join('');
 
-  document.getElementById('diary-list').innerHTML = diaryEntries.map((d,i)=>`
+  const diaryYears = [...new Set(diaryEntries.map(d=>String(d.date||'').slice(0,4)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  if (!diaryYears.includes(selectedDiaryYear) && selectedDiaryYear!=='all') selectedDiaryYear = 'all';
+  document.getElementById('diary-year-picker').innerHTML = diaryYears.length ? [
+    `<span class="chip ${selectedDiaryYear==='all'?'sel':''}" onclick="pickDiaryYear('all')">全部</span>`,
+    ...diaryYears.map(y=>`<span class="chip ${selectedDiaryYear===y?'sel':''}" onclick="pickDiaryYear('${y}')">${y}</span>`)
+  ].join('') : '';
+  const diaryEntriesForList = diaryEntries
+    .map((d,i)=>({d,i}))
+    .filter(({d}) => selectedDiaryYear==='all' || String(d.date||'').slice(0,4)===selectedDiaryYear);
+  document.getElementById('diary-list').innerHTML = diaryEntriesForList.map(({d,i})=>`
     <div class="list-item">
       <div style="flex:1;cursor:pointer;" onclick="viewDiary(${i})">
         <span class="item-title" style="display:block;">${d.title}</span>
