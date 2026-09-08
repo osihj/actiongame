@@ -74,7 +74,7 @@
 
   .tag{display:inline-block;font-size:12px;padding:6px 14px;border-radius:999px;border:0.5px solid var(--line);
     color:var(--blue);margin:0 6px 6px 0;cursor:pointer;font-weight:700;}
-  .tag.active{background:var(--yellow);color:var(--ink);border-color:var(--yellow);}
+  .tag.active{background:var(--yellow);color:var(--white);border-color:var(--yellow);}
 
   .add-btn{width:100%;padding:12px;border-radius:999px;border:0.5px dashed var(--green-soft);background:var(--white);
     color:var(--blue);font-size:14px;cursor:pointer;margin-bottom:16px;font-weight:700;}
@@ -145,9 +145,38 @@
   .cal-day .dot{position:absolute;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--coral);}
   .cal-day.selected .dot{background:var(--white);}
   .cal-grid.week-mode{grid-template-rows:auto;}
+
+  .login-gate{position:fixed;inset:0;background:var(--bg);z-index:100;
+    display:flex;align-items:center;justify-content:center;padding:24px;}
+  .login-card{width:100%;max-width:320px;background:var(--white);border-radius:24px;padding:36px 28px;
+    text-align:center;box-shadow:0 8px 24px rgba(47,74,52,.12);}
+  .login-logo{width:56px;height:56px;border-radius:50%;background:var(--green);margin:0 auto 16px;
+    display:flex;align-items:center;justify-content:center;}
+  .login-logo i{color:var(--white);font-size:26px;}
+  .login-card h1{font-size:20px;font-weight:800;margin:0 0 2px;color:var(--ink);}
+  .login-sub{font-size:11px;letter-spacing:1px;color:var(--muted);margin:0 0 18px;}
+  .login-desc{font-size:13px;color:var(--muted);line-height:1.6;margin:0 0 22px;}
+  .login-google-btn{width:100%;padding:12px;border-radius:999px;border:0.5px solid var(--line);
+    background:var(--white);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;}
+  .login-google-btn i{font-size:18px;color:var(--green);}
 </style>
 </head>
 <body>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-card">
+    <div class="login-logo"><i class="ti ti-notebook"></i></div>
+    <h1>吾觀景耀</h1>
+    <p class="login-sub">DAILY · WORK · LIFE</p>
+    <p class="login-desc" id="login-status-text">請使用藏書閣的 Google 帳號登入，才能繼續使用。</p>
+    <button type="button" class="login-google-btn" onclick="syncWithShuku()">
+      <i class="ti ti-brand-google"></i> 使用 Google 帳號登入
+    </button>
+  </div>
+</div>
+
+<div id="app-shell" style="display:none;">
 
 <div class="topbar">
   <i class="ti ti-menu-2" onclick="toggleDrawer(true)"></i>
@@ -255,11 +284,12 @@
 </section>
 
 <section class="page" data-page="diary">
-  <p class="eyebrow">DIARY</p>
-  <h2 class="title">日記</h2>
-  <div class="card" id="diary-login-banner" style="display:none;">
-    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">日記需要登入藏書閣帳號才能新增與同步，請先登入。</p>
-    <button type="button" class="import-btn" style="width:100%;" onclick="syncWithShuku()">登入藏書閣帳號</button>
+  <div class="row" style="align-items:flex-start;margin-bottom:2px;">
+    <div>
+      <p class="eyebrow">DIARY</p>
+      <h2 class="title" style="margin-bottom:4px;">日記</h2>
+    </div>
+    <button type="button" class="import-btn" onclick="switchPage('diary-all')">所有日記</button>
   </div>
   <div class="card">
     <input id="diary-date" type="date">
@@ -269,18 +299,24 @@
     <p class="field-label">標籤</p>
     <div class="chip-picker" id="diary-tags-picker"></div>
     <input id="diary-event" placeholder="事件，例如：與朋友聚餐">
-    <textarea id="diary-content" placeholder="寫下今天發生的事..." rows="4"></textarea>
+    <textarea id="diary-content" placeholder="寫下今天發生的事...&#10;可用「1. 」開頭做編號清單，或「- 」開頭做項目清單" rows="4"></textarea>
     <button class="save-btn" onclick="addDiary()">儲存</button>
   </div>
+</section>
+
+<section class="page" data-page="diary-all">
+  <p class="eyebrow">DIARY</p>
+  <h2 class="title">所有日記</h2>
   <div class="card"><div id="diary-list"></div></div>
 </section>
 
 <section class="page" data-page="recipe">
-  <p class="eyebrow">RECIPE</p>
-  <h2 class="title">食譜</h2>
-  <div class="card" id="recipe-login-banner" style="display:none;">
-    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">食譜需要登入藏書閣帳號才能新增與同步，請先登入。</p>
-    <button type="button" class="import-btn" style="width:100%;" onclick="syncWithShuku()">登入藏書閣帳號</button>
+  <div class="row" style="align-items:flex-start;margin-bottom:2px;">
+    <div>
+      <p class="eyebrow">RECIPE</p>
+      <h2 class="title" style="margin-bottom:4px;">食譜</h2>
+    </div>
+    <button type="button" class="import-btn" onclick="switchPage('recipe-all')">所有食譜</button>
   </div>
   <button class="add-btn" onclick="toggleForm('recipe-form')">+ 新增食譜</button>
   <div class="inline-form card" id="recipe-form">
@@ -323,6 +359,11 @@
     <textarea id="recipe-notes" placeholder="備註" rows="2"></textarea>
     <button class="save-btn" onclick="addRecipe()">儲存</button>
   </div>
+</section>
+
+<section class="page" data-page="recipe-all">
+  <p class="eyebrow">RECIPE</p>
+  <h2 class="title">所有食譜</h2>
   <div class="card"><div id="recipe-list"></div></div>
 </section>
 
@@ -364,6 +405,8 @@
 
 <div class="sheet-backdrop" id="detail-backdrop" onclick="closeDetailBg(event)">
   <div class="sheet" id="detail-sheet" style="max-height:82vh;overflow-y:auto;padding:20px;"></div>
+</div>
+
 </div>
 
 <script>
@@ -431,9 +474,11 @@ function renderNav(activeId){
     </div>`).join('');
 }
 
+const EXTRA_PAGE_TITLES = { 'diary-all':'所有日記', 'recipe-all':'所有食譜' };
 function switchPage(id){
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page===id));
-  document.getElementById('topbar-title').textContent = NAV.find(n=>n.id===id).label;
+  const navItem = NAV.find(n=>n.id===id);
+  document.getElementById('topbar-title').textContent = navItem ? navItem.label : (EXTRA_PAGE_TITLES[id] || '');
   renderNav(id);
   toggleDrawer(false);
   renderAll();
@@ -773,6 +818,36 @@ function openDetail(html){
 function closeDetail(){ document.getElementById('detail-backdrop').classList.remove('open'); }
 function closeDetailBg(e){ if(e.target.id==='detail-backdrop') closeDetail(); }
 
+function renderTextBlocks(text){
+  if(!text) return '';
+  const lines = text.split(/\r?\n/);
+  let html = '', buffer = [], mode = null;
+  function flush(){
+    if(!buffer.length) return;
+    if(mode==='ol') html += '<ol style="font-size:14px;line-height:1.9;padding-left:20px;margin:0 0 10px;">' + buffer.map(t=>`<li>${escapeHtml(t)}</li>`).join('') + '</ol>';
+    else if(mode==='ul') html += '<ul style="font-size:14px;line-height:1.9;padding-left:20px;margin:0 0 10px;">' + buffer.map(t=>`<li>${escapeHtml(t)}</li>`).join('') + '</ul>';
+    else html += buffer.map(t=>t ? `<p style="font-size:14px;line-height:1.8;margin:0 0 10px;">${escapeHtml(t)}</p>` : '').join('');
+    buffer = [];
+  }
+  lines.forEach(raw=>{
+    const line = raw.trim();
+    const numMatch = line.match(/^(\d+)[.、)）]\s*(.*)$/);
+    const bulletMatch = line.match(/^[-*・‧•]\s+(.*)$/);
+    if(numMatch && numMatch[2]){
+      if(mode!=='ol'){ flush(); mode='ol'; }
+      buffer.push(numMatch[2]);
+    } else if(bulletMatch && bulletMatch[1]){
+      if(mode!=='ul'){ flush(); mode='ul'; }
+      buffer.push(bulletMatch[1]);
+    } else {
+      if(mode!==null){ flush(); mode=null; }
+      buffer.push(line);
+    }
+  });
+  flush();
+  return html || `<p style="font-size:14px;color:var(--muted);">（無內容）</p>`;
+}
+
 function viewDiary(i){
   const d = diaryEntries[i];
   if(!d) return;
@@ -780,7 +855,7 @@ function viewDiary(i){
     <div class="sheet-title" style="text-align:left;padding:0 0 10px;">${escapeHtml(d.title)}</div>
     <p class="item-meta" style="margin-bottom:14px;">${d.date} · ${d.category}${d.tags && d.tags.length ? ' · ' + d.tags.map(escapeHtml).join(', ') : ''}</p>
     ${d.event ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">事件：${escapeHtml(d.event)}</p>` : ''}
-    <p style="font-size:14px;line-height:1.8;white-space:pre-wrap;">${escapeHtml(d.content)}</p>
+    ${renderTextBlocks(d.content)}
   `);
 }
 
@@ -808,16 +883,7 @@ function viewRecipe(i){
   `);
 }
 
-function updateShukuBanners(){
-  const loggedIn = !!window.shukuUid;
-  const diaryBanner = document.getElementById('diary-login-banner');
-  const recipeBanner = document.getElementById('recipe-login-banner');
-  if (diaryBanner) diaryBanner.style.display = loggedIn ? 'none' : 'block';
-  if (recipeBanner) recipeBanner.style.display = loggedIn ? 'none' : 'block';
-}
-
 function renderAll(){
-  updateShukuBanners();
   document.getElementById('today-date').textContent =
     new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
 
@@ -975,21 +1041,28 @@ function renderAll(){
 
   onAuthStateChanged(fbAuth, (user) => {
     const btn = document.getElementById('shuku-sync-btn');
+    const gate = document.getElementById('login-gate');
+    const shell = document.getElementById('app-shell');
+    const statusText = document.getElementById('login-status-text');
     if (user && ALLOWED_EMAIL && user.email !== ALLOWED_EMAIL) {
+      if (statusText) statusText.textContent = '這個 Google 帳號沒有使用權限，請改用授權帳號登入。';
       alert("這個 Google 帳號沒有使用權限。");
       signOut(fbAuth);
       return;
     }
     if (user) {
       window.shukuUid = user.uid;
-      if (btn) btn.textContent = '已同步藏書閣（' + user.email + '）';
+      if (btn) { btn.textContent = '登出（' + user.email + '）'; btn.onclick = () => signOut(fbAuth); }
       startShukuSync(user.uid);
+      if (gate) gate.style.display = 'none';
+      if (shell) shell.style.display = 'block';
     } else {
       window.shukuUid = null;
-      if (btn) btn.textContent = '登入同步藏書閣帳號';
+      if (btn) { btn.textContent = '登入同步藏書閣帳號'; btn.onclick = () => window.syncWithShuku(); }
       stopShukuSync();
+      if (gate) gate.style.display = 'flex';
+      if (shell) shell.style.display = 'none';
     }
-    updateShukuBanners();
   });
 })();
 
