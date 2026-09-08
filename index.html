@@ -85,12 +85,20 @@
   .inline-form{display:none;}
   .inline-form.open{display:block;}
 
-  .mood-row{display:flex;gap:8px;margin-bottom:16px;}
-  .mood{flex:1;text-align:center;padding:12px 4px;border-radius:14px;border:0.5px solid var(--line);cursor:pointer;}
-  .mood.sel{background:var(--yellow);border-color:var(--yellow);}
-  .mood.sel i,.mood.sel span{color:var(--ink);}
-  .mood i{font-size:20px;color:var(--muted);}
-  .mood span{display:block;font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;}
+  .chip-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .chip{padding:6px 14px;border-radius:999px;border:0.5px solid var(--line);font-size:12px;font-weight:600;
+    color:var(--muted);cursor:pointer;background:var(--bg);}
+  .chip.sel{background:var(--coral);border-color:var(--coral);color:var(--white);}
+  .field-label{font-size:12px;color:var(--muted);font-weight:700;margin:0 0 6px;}
+
+  .import-row{margin-bottom:10px;}
+  .import-btn{padding:8px 12px;border-radius:999px;border:0.5px solid var(--line);background:var(--white);
+    color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;}
+  .import-panel{margin-bottom:10px;}
+  .import-panel-actions{display:flex;gap:8px;}
+  .import-panel-actions button{flex:1;padding:9px;border-radius:999px;border:0.5px solid var(--line);
+    font-size:13px;font-weight:700;cursor:pointer;background:var(--white);color:var(--ink);}
+  .import-panel-actions button.confirm{background:var(--coral);border-color:var(--coral);color:var(--white);}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
   .stat{background:var(--white);border-radius:16px;padding:14px;box-shadow:0 2px 8px rgba(47,74,52,.06);}
@@ -231,9 +239,11 @@
   <div class="card">
     <input id="diary-date" type="date">
     <input id="diary-title" placeholder="標題">
-    <input id="diary-category" placeholder="分類，例如：生活">
+    <p class="field-label">分類</p>
+    <div class="chip-picker" id="diary-category-picker"></div>
+    <p class="field-label">標籤</p>
+    <div class="chip-picker" id="diary-tags-picker"></div>
     <input id="diary-event" placeholder="事件，例如：與朋友聚餐">
-    <input id="diary-tags" placeholder="標籤，用逗號分隔，例如：開心,旅行">
     <textarea id="diary-content" placeholder="寫下今天發生的事..." rows="4"></textarea>
     <button class="save-btn" onclick="addDiary()">儲存</button>
   </div>
@@ -246,13 +256,40 @@
   <button class="add-btn" onclick="toggleForm('recipe-form')">+ 新增食譜</button>
   <div class="inline-form card" id="recipe-form">
     <input id="recipe-name" placeholder="名稱，例如：番茄炒蛋">
-    <input id="recipe-category" placeholder="分類，例如：家常菜">
-    <input id="recipe-tags" placeholder="標籤，用逗號分隔">
+    <p class="field-label">分類</p>
+    <div class="chip-picker" id="recipe-category-picker"></div>
+    <p class="field-label">標籤</p>
+    <div class="chip-picker" id="recipe-tags-picker"></div>
     <input id="recipe-servings" placeholder="份量，例如：2 人份">
     <input id="recipe-prep-time" placeholder="準備時間，例如：10 分鐘">
     <input id="recipe-make-time" placeholder="製作時間，例如：15 分鐘">
+
+    <div class="import-row">
+      <button type="button" class="import-btn" id="recipe-import-ingredients-btn">貼上食材清單匯入</button>
+    </div>
+    <div class="import-panel" id="recipe-import-ingredients-panel" hidden>
+      <p class="field-label">每行一項食材，例如「雞胸肉 300克」，貼上後按「解析並帶入」</p>
+      <textarea id="recipe-import-ingredients-input" rows="5" placeholder="雞胸肉 300克&#10;洋蔥 1顆&#10;醬油 2大匙&#10;鹽 少許"></textarea>
+      <div class="import-panel-actions">
+        <button type="button" id="recipe-import-ingredients-cancel">取消</button>
+        <button type="button" class="confirm" id="recipe-import-ingredients-confirm">解析並帶入</button>
+      </div>
+    </div>
     <textarea id="recipe-ingredients" placeholder="食材，一行一項，格式：名稱,份量,單位&#10;例如：番茄,2,顆" rows="3"></textarea>
+
+    <div class="import-row">
+      <button type="button" class="import-btn" id="recipe-import-steps-btn">貼上做法匯入</button>
+    </div>
+    <div class="import-panel" id="recipe-import-steps-panel" hidden>
+      <p class="field-label">每行（或每個編號）算一個步驟，例如「1. 雞胸肉切塊」，貼上後按「解析並帶入」</p>
+      <textarea id="recipe-import-steps-input" rows="5" placeholder="1. 雞胸肉切塊，醃15分鐘&#10;2. 洋蔥切絲爆香&#10;3. 下雞肉拌炒至熟"></textarea>
+      <div class="import-panel-actions">
+        <button type="button" id="recipe-import-steps-cancel">取消</button>
+        <button type="button" class="confirm" id="recipe-import-steps-confirm">解析並帶入</button>
+      </div>
+    </div>
     <textarea id="recipe-steps" placeholder="做法，一行一個步驟" rows="3"></textarea>
+
     <input id="recipe-source-url" placeholder="來源連結">
     <textarea id="recipe-notes" placeholder="備註" rows="2"></textarea>
     <button class="save-btn" onclick="addRecipe()">儲存</button>
@@ -328,6 +365,30 @@ let notes = [
 let diaryEntries = [];
 let recipes = [];
 let selectedTag = null;
+
+// 以下分類／標籤清單之後串接藏書閣 Firebase 後，會改由 diaryMeta / recipeMeta
+// 文件（categoryOrder + manualCategories／tagOrder + manualTags）同步覆蓋，
+// 吾app 這邊只負責「點選」不負責「輸入」，目前先放預設清單頂替。
+let diaryCategories = ['未分類','生活','工作','旅行','家庭'];
+let diaryTags = ['開心','低潮','紀錄','靈感'];
+let recipeCategories = ['未分類','家常菜','甜點','湯品','異國料理'];
+let recipeTags = ['快速','宴客','存糧','低卡'];
+
+let selectedDiaryCategory = diaryCategories[0];
+let selectedDiaryTags = [];
+let selectedRecipeCategory = recipeCategories[0];
+let selectedRecipeTags = [];
+
+function pickDiaryCategory(c){ selectedDiaryCategory = c; renderAll(); }
+function toggleDiaryTag(t){
+  selectedDiaryTags = selectedDiaryTags.includes(t) ? selectedDiaryTags.filter(x=>x!==t) : [...selectedDiaryTags, t];
+  renderAll();
+}
+function pickRecipeCategory(c){ selectedRecipeCategory = c; renderAll(); }
+function toggleRecipeTag(t){
+  selectedRecipeTags = selectedRecipeTags.includes(t) ? selectedRecipeTags.filter(x=>x!==t) : [...selectedRecipeTags, t];
+  renderAll();
+}
 
 function renderNav(activeId){
   const el = document.getElementById('nav-list');
@@ -428,31 +489,29 @@ function addDiary(){
   const title = document.getElementById('diary-title').value.trim();
   const content = document.getElementById('diary-content').value.trim();
   if(!title || !content) return;
-  const tags = document.getElementById('diary-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   diaryEntries.unshift({
     id: 'local-' + Date.now(),
     uid: '',
     date,
     title,
-    category: document.getElementById('diary-category').value.trim() || '未分類',
+    category: selectedDiaryCategory || '未分類',
     event: document.getElementById('diary-event').value.trim(),
-    tags,
+    tags: [...selectedDiaryTags],
     content,
     createdAt: Date.now()
   });
   document.getElementById('diary-date').value='';
   document.getElementById('diary-title').value='';
-  document.getElementById('diary-category').value='';
   document.getElementById('diary-event').value='';
-  document.getElementById('diary-tags').value='';
   document.getElementById('diary-content').value='';
+  selectedDiaryCategory = diaryCategories[0];
+  selectedDiaryTags = [];
   renderAll();
 }
 
 function addRecipe(){
   const name = document.getElementById('recipe-name').value.trim();
   if(!name) return;
-  const tags = document.getElementById('recipe-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const ingredients = document.getElementById('recipe-ingredients').value.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
     const parts = line.split(',').map(s=>(s||'').trim());
     return {name: parts[0]||'', amount: parts[1]||'', unit: parts[2]||''};
@@ -462,8 +521,8 @@ function addRecipe(){
     id: 'local-' + Date.now(),
     uid: '',
     name,
-    category: document.getElementById('recipe-category').value.trim() || '未分類',
-    tags,
+    category: selectedRecipeCategory || '未分類',
+    tags: [...selectedRecipeTags],
     servings: document.getElementById('recipe-servings').value.trim(),
     prepTime: document.getElementById('recipe-prep-time').value.trim(),
     makeTime: document.getElementById('recipe-make-time').value.trim(),
@@ -478,10 +537,74 @@ function addRecipe(){
     createdAt: Date.now(),
     createdDate: new Date().toISOString().slice(0,10)
   });
-  ['recipe-name','recipe-category','recipe-tags','recipe-servings','recipe-prep-time','recipe-make-time','recipe-ingredients','recipe-steps','recipe-source-url','recipe-notes'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['recipe-name','recipe-servings','recipe-prep-time','recipe-make-time','recipe-ingredients','recipe-steps','recipe-source-url','recipe-notes'].forEach(id=>{ document.getElementById(id).value=''; });
+  selectedRecipeCategory = recipeCategories[0];
+  selectedRecipeTags = [];
   toggleForm('recipe-form');
   renderAll();
 }
+
+// ---------- 貼上匯入（食材／做法），解析邏輯與藏書閣 recipes.html 對齊 ----------
+const IMPORT_INGREDIENT_UNIT_PATTERN = "克|公克|公斤|kg|毫克|ml|cc|毫升|公升|l|大匙|小匙|湯匙|茶匙|杯|顆|粒|條|片|瓣|包|盒|罐|支|把|勺|滴|少許|適量|人份";
+function parseImportedIngredients(text){
+  if (!text || !text.trim()) return [];
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const withAmountRe = new RegExp("^(.*?)[\\s:：]+([\\d./]+)\\s*(" + IMPORT_INGREDIENT_UNIT_PATTERN + ")?\\s*$");
+  const noAmountRe = new RegExp("^(.*?)[\\s:：]+(" + IMPORT_INGREDIENT_UNIT_PATTERN + ")\\s*$");
+  return lines.map((rawLine) => {
+    const line = rawLine.replace(/^[-*・‧•]\s*/, "").trim();
+    let m = line.match(withAmountRe);
+    if (m && m[1].trim()) return { name: m[1].trim(), amount: m[2].trim(), unit: (m[3] || "").trim() };
+    m = line.match(noAmountRe);
+    if (m && m[1].trim()) return { name: m[1].trim(), amount: "", unit: m[2].trim() };
+    return { name: line, amount: "", unit: "" };
+  }).filter((it) => it.name);
+}
+function parseImportedSteps(text){
+  if (!text || !text.trim()) return [];
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return lines
+    .map((line) => line
+      .replace(/^(?:step\s*)?(\d+|[一二三四五六七八九十]+)[.、)）：:]\s*/i, "")
+      .replace(/^[①②③④⑤⑥⑦⑧⑨⑩]\s*/, "")
+      .replace(/^[-*・‧•]\s*/, "")
+      .trim())
+    .filter(Boolean);
+}
+function importIngredientsFromText(text){
+  const parsed = parseImportedIngredients(text);
+  if (!parsed.length) { alert("沒有偵測到可匯入的食材內容，請確認每行一項食材。"); return; }
+  const ta = document.getElementById('recipe-ingredients');
+  const existing = ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const appended = parsed.map(p => [p.name, p.amount, p.unit].join(','));
+  ta.value = [...existing, ...appended].join('\n');
+}
+function importStepsFromText(text){
+  const parsed = parseImportedSteps(text);
+  if (!parsed.length) { alert("沒有偵測到可匯入的做法內容，請確認每行一個步驟。"); return; }
+  const ta = document.getElementById('recipe-steps');
+  const existing = ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+  ta.value = [...existing, ...parsed].join('\n');
+}
+function setupImportPanel({ btnId, panelId, textareaId, confirmId, cancelId, onImport }){
+  const btn = document.getElementById(btnId), panel = document.getElementById(panelId), textarea = document.getElementById(textareaId);
+  const confirmBtn = document.getElementById(confirmId), cancelBtn = document.getElementById(cancelId);
+  function open(){ panel.hidden = false; btn.hidden = true; textarea.value = ""; textarea.focus(); }
+  function close(){ panel.hidden = true; btn.hidden = false; textarea.value = ""; }
+  btn.addEventListener("click", open);
+  cancelBtn.addEventListener("click", close);
+  confirmBtn.addEventListener("click", () => { onImport(textarea.value); close(); });
+}
+setupImportPanel({
+  btnId: "recipe-import-ingredients-btn", panelId: "recipe-import-ingredients-panel",
+  textareaId: "recipe-import-ingredients-input", confirmId: "recipe-import-ingredients-confirm",
+  cancelId: "recipe-import-ingredients-cancel", onImport: importIngredientsFromText
+});
+setupImportPanel({
+  btnId: "recipe-import-steps-btn", panelId: "recipe-import-steps-panel",
+  textareaId: "recipe-import-steps-input", confirmId: "recipe-import-steps-confirm",
+  cancelId: "recipe-import-steps-cancel", onImport: importStepsFromText
+});
 
 function fmtCheck(done){ return done ? '<i class="ti ti-check"></i>' : ''; }
 
@@ -538,6 +661,11 @@ function renderAll(){
       <span class="item-meta">${n.cat}</span>
     </div>`).join('') || '<div class="empty">尚無筆記</div>';
 
+  document.getElementById('diary-category-picker').innerHTML = diaryCategories.map(c=>`
+    <span class="chip ${selectedDiaryCategory===c?'sel':''}" onclick="pickDiaryCategory('${c}')">${c}</span>`).join('');
+  document.getElementById('diary-tags-picker').innerHTML = diaryTags.map(t=>`
+    <span class="chip ${selectedDiaryTags.includes(t)?'sel':''}" onclick="toggleDiaryTag('${t}')">${t}</span>`).join('');
+
   document.getElementById('diary-list').innerHTML = diaryEntries.map(d=>`
     <div class="list-item">
       <div style="flex:1;">
@@ -545,6 +673,11 @@ function renderAll(){
         <span class="item-meta">${d.date} · ${d.category}${d.tags.length ? ' · ' + d.tags.join(', ') : ''}</span>
       </div>
     </div>`).join('') || '<div class="empty">尚無日記</div>';
+
+  document.getElementById('recipe-category-picker').innerHTML = recipeCategories.map(c=>`
+    <span class="chip ${selectedRecipeCategory===c?'sel':''}" onclick="pickRecipeCategory('${c}')">${c}</span>`).join('');
+  document.getElementById('recipe-tags-picker').innerHTML = recipeTags.map(t=>`
+    <span class="chip ${selectedRecipeTags.includes(t)?'sel':''}" onclick="toggleRecipeTag('${t}')">${t}</span>`).join('');
 
   document.getElementById('recipe-list').innerHTML = recipes.map(r=>`
     <div class="list-item">
