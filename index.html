@@ -3,33 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>吾關景耀</title>
+<title>吾觀景耀</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
   :root{
-    --bg:#F7F7F5;
-    --coral:#FF6F61;
-    --blue:#3E9AE0;
-    --yellow:#F4B400;
-    --orange:#F2994A;
-    --green:#3FA65C;
-    --pink:#E86AA6;
-    --purple:#8B7FD6;
-    --ink:#1F2937;
-    --muted:#8A8F98;
+    --bg:#FAFAF7;
+    --green:#2F4A34;
+    --green-soft:#4A6B52;
+    --coral:#2F4A34;
+    --blue:#2F4A34;
+    --yellow:#2F4A34;
+    --orange:#2F4A34;
+    --pink:#2F4A34;
+    --purple:#2F4A34;
+    --ink:#2F2C24;
+    --muted:#6B6559;
     --white:#FFFFFF;
-    --line:#E5E7EB;
+    --line:#E8E6DE;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;}
   body{max-width:420px;margin:0 auto;min-height:100vh;position:relative;overflow-x:hidden;}
 
-  .topbar{display:flex;align-items:center;gap:10px;padding:16px;background:var(--white);
-    position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line);}
+  .topbar{display:flex;align-items:center;gap:10px;padding:16px;background:var(--bg);
+    position:sticky;top:0;z-index:20;border-bottom:0.5px solid var(--line);}
   .topbar i{font-size:22px;color:var(--ink);cursor:pointer;}
   .topbar span{font-size:17px;font-weight:700;color:var(--ink);}
-  .topbar .dot{width:6px;height:6px;border-radius:50%;background:var(--blue);}
+  .topbar .dot{display:none;}
 
   .backdrop{position:fixed;inset:0;background:rgba(20,40,60,0.4);z-index:29;
     opacity:0;pointer-events:none;transition:opacity .2s;}
@@ -39,13 +40,11 @@
   .drawer.open{transform:translateX(0);}
   .drawer h1{font-size:20px;margin:0 0 2px;font-weight:800;color:var(--ink);}
   .drawer .sub{font-size:11px;letter-spacing:1px;color:var(--muted);margin:0 0 24px;}
-  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;
-    color:var(--ink);cursor:pointer;font-size:15px;font-weight:600;border:2px solid var(--line);
-    margin-bottom:10px;}
-  .nav-item .icobox{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;
-    justify-content:center;flex-shrink:0;}
-  .nav-item .icobox i{font-size:17px;color:var(--white);}
-  .nav-item span.label{flex:1;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:12px;
+    color:var(--ink);cursor:pointer;font-size:15px;font-weight:500;}
+  .nav-item i{font-size:19px;color:var(--muted);}
+  .nav-item.active{background:var(--white);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+  .nav-item.active i{color:var(--ink);}
 
   .page{display:none;padding:20px 16px 100px;}
   .page.active{display:block;}
@@ -61,7 +60,7 @@
   .cat-item p{font-size:11px;margin:6px 0 0;color:var(--ink);font-weight:600;}
 
   .card{background:var(--white);border-radius:18px;padding:16px;margin-bottom:12px;
-    box-shadow:0 3px 10px rgba(42,117,187,.08);}
+    box-shadow:0 2px 8px rgba(47,74,52,.06);}
   .row{display:flex;align-items:center;justify-content:space-between;}
   .list-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);}
   .list-item:last-child{border-bottom:none;}
@@ -73,13 +72,13 @@
   .item-title.done{text-decoration:line-through;color:var(--muted);}
   .item-meta{font-size:12px;color:var(--muted);}
 
-  .tag{display:inline-block;font-size:12px;padding:6px 14px;border-radius:999px;border:2px solid var(--line);
+  .tag{display:inline-block;font-size:12px;padding:6px 14px;border-radius:999px;border:0.5px solid var(--line);
     color:var(--blue);margin:0 6px 6px 0;cursor:pointer;font-weight:700;}
   .tag.active{background:var(--yellow);color:var(--ink);border-color:var(--yellow);}
 
-  .add-btn{width:100%;padding:12px;border-radius:999px;border:2px dashed var(--blue);background:var(--white);
+  .add-btn{width:100%;padding:12px;border-radius:999px;border:0.5px dashed var(--green-soft);background:var(--white);
     color:var(--blue);font-size:14px;cursor:pointer;margin-bottom:16px;font-weight:700;}
-  input,textarea{width:100%;padding:10px 12px;border-radius:12px;border:2px solid var(--line);
+  input,textarea{width:100%;padding:10px 12px;border-radius:12px;border:0.5px solid var(--line);
     background:var(--bg);font-size:14px;margin-bottom:10px;font-family:inherit;color:var(--ink);}
   .save-btn{width:100%;padding:12px;border-radius:999px;border:none;background:var(--coral);color:var(--white);
     font-size:14px;cursor:pointer;font-weight:700;}
@@ -87,21 +86,21 @@
   .inline-form.open{display:block;}
 
   .mood-row{display:flex;gap:8px;margin-bottom:16px;}
-  .mood{flex:1;text-align:center;padding:12px 4px;border-radius:14px;border:2px solid var(--line);cursor:pointer;}
+  .mood{flex:1;text-align:center;padding:12px 4px;border-radius:14px;border:0.5px solid var(--line);cursor:pointer;}
   .mood.sel{background:var(--yellow);border-color:var(--yellow);}
   .mood.sel i,.mood.sel span{color:var(--ink);}
   .mood i{font-size:20px;color:var(--muted);}
   .mood span{display:block;font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
-  .stat{background:var(--white);border-radius:16px;padding:14px;box-shadow:0 3px 10px rgba(42,117,187,.08);}
+  .stat{background:var(--white);border-radius:16px;padding:14px;box-shadow:0 2px 8px rgba(47,74,52,.06);}
   .stat .n{font-size:22px;font-weight:800;color:var(--blue);}
   .stat .l{font-size:12px;color:var(--muted);font-weight:600;}
 
-  .fab{position:fixed;right:24px;bottom:28px;width:58px;height:58px;border-radius:50%;background:var(--yellow);
+  .fab{position:fixed;right:24px;bottom:28px;width:56px;height:56px;border-radius:50%;background:var(--green);
     display:flex;align-items:center;justify-content:center;z-index:15;cursor:pointer;
-    box-shadow:0 4px 14px rgba(255,203,5,.5);}
-  .fab i{color:var(--ink);font-size:26px;}
+    box-shadow:0 4px 14px rgba(47,74,52,.35);}
+  .fab i{color:var(--white);font-size:24px;}
 
   .sheet-backdrop{position:fixed;inset:0;background:rgba(20,40,60,0.4);z-index:39;opacity:0;pointer-events:none;
     transition:opacity .2s;display:flex;align-items:flex-end;justify-content:center;}
@@ -110,12 +109,13 @@
   .sheet-backdrop.open .sheet{transform:translateY(0);}
   .sheet{transform:translateY(100%);transition:transform .25s;}
   .sheet-title{text-align:center;font-size:17px;font-weight:800;padding:20px 0 12px;color:var(--ink);}
-  .qgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 20px 24px;}
-  .qcell{text-align:center;cursor:pointer;}
-  .qcircle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    margin:0 auto;box-shadow:0 4px 10px rgba(0,0,0,.12);}
-  .qcircle i{font-size:24px;color:var(--white);}
-  .qcell p{font-size:12px;margin:8px 0 0;color:var(--ink);font-weight:700;}
+  .qgrid{display:grid;grid-template-columns:repeat(3,1fr);border-top:0.5px solid var(--line);}
+  .qcell{text-align:center;padding:24px 4px;border-right:0.5px solid var(--line);
+    border-bottom:0.5px solid var(--line);cursor:pointer;}
+  .qgrid .qcell:nth-child(3n){border-right:none;}
+  .qgrid .qcell:nth-child(n+4){border-bottom:none;}
+  .qcell i{font-size:28px;color:var(--green-soft);}
+  .qcell p{font-size:12px;margin:10px 0 0;color:var(--muted);}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
 </style>
 </head>
@@ -130,7 +130,7 @@
 
 <div class="backdrop" id="backdrop" onclick="toggleDrawer(false)"></div>
 <div class="drawer" id="drawer">
-  <h1>希安的工作台</h1>
+  <h1>吾觀景耀</h1>
   <p class="sub">DAILY · WORK · LIFE</p>
   <div id="nav-list"></div>
 </div>
@@ -263,12 +263,12 @@
   <div class="sheet">
     <div class="sheet-title">快速紀錄</div>
     <div class="qgrid">
-      <div class="qcell" onclick="quickAction('exercise')"><div class="qcircle" style="background:var(--coral);"><i class="ti ti-barbell"></i></div><p>運動</p></div>
-      <div class="qcell" onclick="quickAction('budget')"><div class="qcircle" style="background:var(--yellow);"><i class="ti ti-wallet" style="color:var(--ink);"></i></div><p>記帳</p></div>
-      <div class="qcell" onclick="quickAction('mood')"><div class="qcircle" style="background:var(--green);"><i class="ti ti-mood-smile"></i></div><p>心情</p></div>
-      <div class="qcell" onclick="quickAction('note')"><div class="qcircle" style="background:var(--blue);"><i class="ti ti-pencil"></i></div><p>隨手記</p></div>
-      <div class="qcell" onclick="quickAction('todo')"><div class="qcircle" style="background:var(--coral);"><i class="ti ti-check"></i></div><p>待辦</p></div>
-      <div class="qcell" onclick="quickAction('knowledge')"><div class="qcircle" style="background:var(--blue);"><i class="ti ti-books"></i></div><p>長知識</p></div>
+      <div class="qcell" onclick="quickAction('exercise')"><i class="ti ti-barbell"></i><p>運動</p></div>
+      <div class="qcell" onclick="quickAction('budget')"><i class="ti ti-wallet"></i><p>記帳</p></div>
+      <div class="qcell" onclick="quickAction('mood')"><i class="ti ti-mood-smile"></i><p>心情</p></div>
+      <div class="qcell" onclick="quickAction('note')"><i class="ti ti-pencil"></i><p>隨手記</p></div>
+      <div class="qcell" onclick="quickAction('todo')"><i class="ti ti-check"></i><p>待辦</p></div>
+      <div class="qcell" onclick="quickAction('knowledge')"><i class="ti ti-books"></i><p>長知識</p></div>
     </div>
   </div>
 </div>
@@ -315,10 +315,8 @@ let selectedTag = null;
 function renderNav(activeId){
   const el = document.getElementById('nav-list');
   el.innerHTML = NAV.map(n => `
-    <div class="nav-item" style="border-color:${n.color};${n.id===activeId?`background:color-mix(in srgb, ${n.color} 12%, white);`:''}" onclick="switchPage('${n.id}')">
-      <div class="icobox" style="background:${n.color};"><i class="ti ${n.icon}"></i></div>
-      <span class="label">${n.label}</span>
-      <i class="ti ti-chevron-right" style="font-size:16px;color:var(--muted);"></i>
+    <div class="nav-item ${n.id===activeId?'active':''}" onclick="switchPage('${n.id}')">
+      <i class="ti ${n.icon}"></i><span>${n.label}</span>
     </div>`).join('');
 }
 
