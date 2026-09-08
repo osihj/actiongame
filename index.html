@@ -101,6 +101,9 @@
     color:var(--ink);cursor:pointer;white-space:nowrap;font-weight:600;}
   .ed-list-option:hover{background:var(--bg);}
   .ed-list-option .chk{font-size:14px;color:var(--green);visibility:hidden;flex-shrink:0;}
+
+  .diary-year-select{width:100%;padding:10px 12px;border-radius:12px;border:0.5px solid var(--line);
+    background:var(--bg);font-size:14px;font-weight:600;color:var(--ink);font-family:inherit;}
   .editor-body{min-height:110px;max-height:320px;overflow-y:auto;padding:10px 12px;font-size:14px;
     line-height:1.7;background:var(--bg);outline:none;}
   .editor-body[contenteditable]:empty:before{content:attr(data-placeholder);color:var(--muted);}
@@ -347,7 +350,7 @@
 <section class="page" data-page="diary-all">
   <p class="eyebrow">DIARY</p>
   <h2 class="title">所有日記</h2>
-  <div class="chip-picker" id="diary-year-picker" style="margin-bottom:14px;"></div>
+  <select class="diary-year-select" id="diary-year-picker" onchange="pickDiaryYear(this.value)" style="margin-bottom:14px;"></select>
   <div class="card"><div id="diary-list"></div></div>
 </section>
 
@@ -1176,10 +1179,12 @@ function renderAll(){
 
   const diaryYears = [...new Set(diaryEntries.map(d=>String(d.date||'').slice(0,4)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
   if (!diaryYears.includes(selectedDiaryYear) && selectedDiaryYear!=='all') selectedDiaryYear = 'all';
-  document.getElementById('diary-year-picker').innerHTML = diaryYears.length ? [
-    `<span class="chip ${selectedDiaryYear==='all'?'sel':''}" onclick="pickDiaryYear('all')">全部</span>`,
-    ...diaryYears.map(y=>`<span class="chip ${selectedDiaryYear===y?'sel':''}" onclick="pickDiaryYear('${y}')">${y}</span>`)
-  ].join('') : '';
+  const yearPicker = document.getElementById('diary-year-picker');
+  yearPicker.innerHTML = diaryYears.length ? [
+    `<option value="all">全部年份</option>`,
+    ...diaryYears.map(y=>`<option value="${y}">${y} 年</option>`)
+  ].join('') : `<option value="all">全部年份</option>`;
+  yearPicker.value = selectedDiaryYear;
   const diaryEntriesForList = diaryEntries
     .map((d,i)=>({d,i}))
     .filter(({d}) => selectedDiaryYear==='all' || String(d.date||'').slice(0,4)===selectedDiaryYear);
