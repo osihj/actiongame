@@ -229,12 +229,35 @@
   <p class="eyebrow">DIARY</p>
   <h2 class="title">日記</h2>
   <div class="card">
-    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;font-weight:600;">今天的心情</p>
-    <div class="mood-row" id="mood-row"></div>
-    <textarea id="diary-text" placeholder="寫下今天發生的事..." rows="3"></textarea>
+    <input id="diary-date" type="date">
+    <input id="diary-title" placeholder="標題">
+    <input id="diary-category" placeholder="分類，例如：生活">
+    <input id="diary-event" placeholder="事件，例如：與朋友聚餐">
+    <input id="diary-tags" placeholder="標籤，用逗號分隔，例如：開心,旅行">
+    <textarea id="diary-content" placeholder="寫下今天發生的事..." rows="4"></textarea>
     <button class="save-btn" onclick="addDiary()">儲存</button>
   </div>
   <div class="card"><div id="diary-list"></div></div>
+</section>
+
+<section class="page" data-page="recipe">
+  <p class="eyebrow">RECIPE</p>
+  <h2 class="title">食譜</h2>
+  <button class="add-btn" onclick="toggleForm('recipe-form')">+ 新增食譜</button>
+  <div class="inline-form card" id="recipe-form">
+    <input id="recipe-name" placeholder="名稱，例如：番茄炒蛋">
+    <input id="recipe-category" placeholder="分類，例如：家常菜">
+    <input id="recipe-tags" placeholder="標籤，用逗號分隔">
+    <input id="recipe-servings" placeholder="份量，例如：2 人份">
+    <input id="recipe-prep-time" placeholder="準備時間，例如：10 分鐘">
+    <input id="recipe-make-time" placeholder="製作時間，例如：15 分鐘">
+    <textarea id="recipe-ingredients" placeholder="食材，一行一項，格式：名稱,份量,單位&#10;例如：番茄,2,顆" rows="3"></textarea>
+    <textarea id="recipe-steps" placeholder="做法，一行一個步驟" rows="3"></textarea>
+    <input id="recipe-source-url" placeholder="來源連結">
+    <textarea id="recipe-notes" placeholder="備註" rows="2"></textarea>
+    <button class="save-btn" onclick="addRecipe()">儲存</button>
+  </div>
+  <div class="card"><div id="recipe-list"></div></div>
 </section>
 
 <section class="page" data-page="review">
@@ -265,7 +288,7 @@
     <div class="qgrid">
       <div class="qcell" onclick="quickAction('exercise')"><i class="ti ti-barbell"></i><p>運動</p></div>
       <div class="qcell" onclick="quickAction('budget')"><i class="ti ti-wallet"></i><p>記帳</p></div>
-      <div class="qcell" onclick="quickAction('mood')"><i class="ti ti-mood-smile"></i><p>心情</p></div>
+      <div class="qcell" onclick="quickAction('diary')"><i class="ti ti-feather"></i><p>日記</p></div>
       <div class="qcell" onclick="quickAction('note')"><i class="ti ti-pencil"></i><p>隨手記</p></div>
       <div class="qcell" onclick="quickAction('todo')"><i class="ti ti-check"></i><p>待辦</p></div>
       <div class="qcell" onclick="quickAction('knowledge')"><i class="ti ti-books"></i><p>長知識</p></div>
@@ -283,6 +306,7 @@ const NAV = [
   {id:'budget', label:'記帳', icon:'ti-wallet', color:'var(--green)'},
   {id:'knowledge', label:'知識庫', icon:'ti-books', color:'var(--blue)'},
   {id:'diary', label:'日記', icon:'ti-feather', color:'var(--pink)'},
+  {id:'recipe', label:'食譜', icon:'ti-tools-kitchen-2', color:'var(--coral)'},
   {id:'review', label:'回顧', icon:'ti-chart-bar', color:'var(--purple)'},
   {id:'settings', label:'設定', icon:'ti-settings', color:'var(--muted)'},
 ];
@@ -300,16 +324,9 @@ let expenses = [
 ];
 let notes = [
   {title:'會議記錄範本', cat:'工作筆記'},
-  {title:'義大利麵食譜', cat:'生活雜記'},
 ];
 let diaryEntries = [];
-let moods = [
-  {icon:'ti-mood-smile', label:'開心'},
-  {icon:'ti-mood-neutral', label:'普通'},
-  {icon:'ti-mood-sad', label:'低落'},
-  {icon:'ti-mood-angry', label:'煩躁'},
-];
-let selectedMood = null;
+let recipes = [];
 let selectedTag = null;
 
 function renderNav(activeId){
@@ -343,7 +360,7 @@ function closeSheetBg(e){ if(e.target.id==='sheet-backdrop') closeSheet(); }
 
 function quickAction(type){
   closeSheet();
-  const map = {exercise:'health', budget:'budget', mood:'diary', note:'knowledge', todo:'todo', knowledge:'knowledge'};
+  const map = {exercise:'health', budget:'budget', diary:'diary', note:'knowledge', todo:'todo', knowledge:'knowledge'};
   switchPage(map[type]);
   if(type==='budget') toggleForm('budget-form');
   if(type==='todo') toggleForm('todo-form');
@@ -406,13 +423,63 @@ function addNote(){
 }
 function filterTag(cat){ selectedTag = (selectedTag===cat) ? null : cat; renderAll(); }
 
-function selectMood(i){ selectedMood = i; renderAll(); }
 function addDiary(){
-  const text = document.getElementById('diary-text').value.trim();
-  if(!text || selectedMood===null) return;
-  diaryEntries.unshift({mood: moods[selectedMood].label, text});
-  document.getElementById('diary-text').value='';
-  selectedMood = null;
+  const date = document.getElementById('diary-date').value || new Date().toISOString().slice(0,10);
+  const title = document.getElementById('diary-title').value.trim();
+  const content = document.getElementById('diary-content').value.trim();
+  if(!title || !content) return;
+  const tags = document.getElementById('diary-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  diaryEntries.unshift({
+    id: 'local-' + Date.now(),
+    uid: '',
+    date,
+    title,
+    category: document.getElementById('diary-category').value.trim() || '未分類',
+    event: document.getElementById('diary-event').value.trim(),
+    tags,
+    content,
+    createdAt: Date.now()
+  });
+  document.getElementById('diary-date').value='';
+  document.getElementById('diary-title').value='';
+  document.getElementById('diary-category').value='';
+  document.getElementById('diary-event').value='';
+  document.getElementById('diary-tags').value='';
+  document.getElementById('diary-content').value='';
+  renderAll();
+}
+
+function addRecipe(){
+  const name = document.getElementById('recipe-name').value.trim();
+  if(!name) return;
+  const tags = document.getElementById('recipe-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const ingredients = document.getElementById('recipe-ingredients').value.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const parts = line.split(',').map(s=>(s||'').trim());
+    return {name: parts[0]||'', amount: parts[1]||'', unit: parts[2]||''};
+  });
+  const steps = document.getElementById('recipe-steps').value.split('\n').map(l=>l.trim()).filter(Boolean).map(content=>({type:'step', content, numberStyle:'none'}));
+  recipes.unshift({
+    id: 'local-' + Date.now(),
+    uid: '',
+    name,
+    category: document.getElementById('recipe-category').value.trim() || '未分類',
+    tags,
+    servings: document.getElementById('recipe-servings').value.trim(),
+    prepTime: document.getElementById('recipe-prep-time').value.trim(),
+    makeTime: document.getElementById('recipe-make-time').value.trim(),
+    photoUrl: '',
+    ingredients: ingredients.length ? [{groupName:'', items: ingredients}] : [],
+    steps,
+    ratingJoy: 0,
+    ratingEffort: 0,
+    ratingResult: 0,
+    sourceUrl: document.getElementById('recipe-source-url').value.trim(),
+    notes: document.getElementById('recipe-notes').value.trim(),
+    createdAt: Date.now(),
+    createdDate: new Date().toISOString().slice(0,10)
+  });
+  ['recipe-name','recipe-category','recipe-tags','recipe-servings','recipe-prep-time','recipe-make-time','recipe-ingredients','recipe-steps','recipe-source-url','recipe-notes'].forEach(id=>{ document.getElementById(id).value=''; });
+  toggleForm('recipe-form');
   renderAll();
 }
 
@@ -471,15 +538,21 @@ function renderAll(){
       <span class="item-meta">${n.cat}</span>
     </div>`).join('') || '<div class="empty">尚無筆記</div>';
 
-  document.getElementById('mood-row').innerHTML = moods.map((m,i)=>`
-    <div class="mood ${selectedMood===i?'sel':''}" onclick="selectMood(${i})">
-      <i class="ti ${m.icon}"></i><span>${m.label}</span>
-    </div>`).join('');
   document.getElementById('diary-list').innerHTML = diaryEntries.map(d=>`
     <div class="list-item">
-      <span class="item-title">${d.text}</span>
-      <span class="item-meta">${d.mood}</span>
+      <div style="flex:1;">
+        <span class="item-title" style="display:block;">${d.title}</span>
+        <span class="item-meta">${d.date} · ${d.category}${d.tags.length ? ' · ' + d.tags.join(', ') : ''}</span>
+      </div>
     </div>`).join('') || '<div class="empty">尚無日記</div>';
+
+  document.getElementById('recipe-list').innerHTML = recipes.map(r=>`
+    <div class="list-item">
+      <div style="flex:1;">
+        <span class="item-title" style="display:block;">${r.name}</span>
+        <span class="item-meta">${r.category}${r.servings ? ' · ' + r.servings : ''}${r.tags.length ? ' · ' + r.tags.join(', ') : ''}</span>
+      </div>
+    </div>`).join('') || '<div class="empty">尚無食譜</div>';
 
   document.getElementById('review-todo').textContent = todos.filter(t=>t.done).length;
   document.getElementById('review-diary').textContent = diaryEntries.length;
