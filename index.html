@@ -161,7 +161,7 @@
   <h1>吾觀景耀</h1>
   <p class="sub">DAILY · WORK · LIFE</p>
   <div id="nav-list"></div>
-  <button type="button" id="shuku-sync-btn" class="import-btn" style="width:100%;margin-top:16px;" onclick="syncWithShuku()">登入同步藏書閣分類標籤</button>
+  <button type="button" id="shuku-sync-btn" class="import-btn" style="width:100%;margin-top:16px;" onclick="syncWithShuku()">登入同步藏書閣帳號</button>
 </div>
 
 <section class="page active" data-page="home">
@@ -257,6 +257,10 @@
 <section class="page" data-page="diary">
   <p class="eyebrow">DIARY</p>
   <h2 class="title">日記</h2>
+  <div class="card" id="diary-login-banner" style="display:none;">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">日記需要登入藏書閣帳號才能新增與同步，請先登入。</p>
+    <button type="button" class="import-btn" style="width:100%;" onclick="syncWithShuku()">登入藏書閣帳號</button>
+  </div>
   <div class="card">
     <input id="diary-date" type="date">
     <input id="diary-title" placeholder="標題">
@@ -274,6 +278,10 @@
 <section class="page" data-page="recipe">
   <p class="eyebrow">RECIPE</p>
   <h2 class="title">食譜</h2>
+  <div class="card" id="recipe-login-banner" style="display:none;">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">食譜需要登入藏書閣帳號才能新增與同步，請先登入。</p>
+    <button type="button" class="import-btn" style="width:100%;" onclick="syncWithShuku()">登入藏書閣帳號</button>
+  </div>
   <button class="add-btn" onclick="toggleForm('recipe-form')">+ 新增食譜</button>
   <div class="inline-form card" id="recipe-form">
     <input id="recipe-name" placeholder="名稱，例如：番茄炒蛋">
@@ -352,6 +360,10 @@
       <div class="qcell" onclick="quickAction('knowledge')"><i class="ti ti-books"></i><p>長知識</p></div>
     </div>
   </div>
+</div>
+
+<div class="sheet-backdrop" id="detail-backdrop" onclick="closeDetailBg(event)">
+  <div class="sheet" id="detail-sheet" style="max-height:82vh;overflow-y:auto;padding:20px;"></div>
 </div>
 
 <script>
@@ -613,9 +625,7 @@ function addDiary(){
   const title = document.getElementById('diary-title').value.trim();
   const content = document.getElementById('diary-content').value.trim();
   if(!title || !content) return;
-  diaryEntries.unshift({
-    id: 'local-' + Date.now(),
-    uid: '',
+  const entry = {
     date,
     title,
     category: selectedDiaryCategory || '未分類',
@@ -623,7 +633,13 @@ function addDiary(){
     tags: [...selectedDiaryTags],
     content,
     createdAt: Date.now()
-  });
+  };
+  if (!window.shukuUid) {
+    alert('請先登入藏書閣帳號才能新增日記，登入後請再按一次儲存。');
+    if (window.syncWithShuku) window.syncWithShuku();
+    return;
+  }
+  window.shukuSaveDiary(entry).catch(err => alert('同步到藏書閣失敗：' + (err.message || err)));
   document.getElementById('diary-date').value='';
   document.getElementById('diary-title').value='';
   document.getElementById('diary-event').value='';
@@ -641,9 +657,7 @@ function addRecipe(){
     return {name: parts[0]||'', amount: parts[1]||'', unit: parts[2]||''};
   });
   const steps = document.getElementById('recipe-steps').value.split('\n').map(l=>l.trim()).filter(Boolean).map(content=>({type:'step', content, numberStyle:'none'}));
-  recipes.unshift({
-    id: 'local-' + Date.now(),
-    uid: '',
+  const recipe = {
     name,
     category: selectedRecipeCategory || '未分類',
     tags: [...selectedRecipeTags],
@@ -660,7 +674,13 @@ function addRecipe(){
     notes: document.getElementById('recipe-notes').value.trim(),
     createdAt: Date.now(),
     createdDate: new Date().toISOString().slice(0,10)
-  });
+  };
+  if (!window.shukuUid) {
+    alert('請先登入藏書閣帳號才能新增食譜，登入後請再按一次儲存。');
+    if (window.syncWithShuku) window.syncWithShuku();
+    return;
+  }
+  window.shukuSaveRecipe(recipe).catch(err => alert('同步到藏書閣失敗：' + (err.message || err)));
   ['recipe-name','recipe-servings','recipe-prep-time','recipe-make-time','recipe-ingredients','recipe-steps','recipe-source-url','recipe-notes'].forEach(id=>{ document.getElementById(id).value=''; });
   selectedRecipeCategory = recipeCategories[0];
   selectedRecipeTags = [];
@@ -743,7 +763,61 @@ setupImportPanel({
 
 function fmtCheck(done){ return done ? '<i class="ti ti-check"></i>' : ''; }
 
+function escapeHtml(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function openDetail(html){
+  document.getElementById('detail-sheet').innerHTML = html;
+  document.getElementById('detail-backdrop').classList.add('open');
+}
+function closeDetail(){ document.getElementById('detail-backdrop').classList.remove('open'); }
+function closeDetailBg(e){ if(e.target.id==='detail-backdrop') closeDetail(); }
+
+function viewDiary(i){
+  const d = diaryEntries[i];
+  if(!d) return;
+  openDetail(`
+    <div class="sheet-title" style="text-align:left;padding:0 0 10px;">${escapeHtml(d.title)}</div>
+    <p class="item-meta" style="margin-bottom:14px;">${d.date} · ${d.category}${d.tags && d.tags.length ? ' · ' + d.tags.map(escapeHtml).join(', ') : ''}</p>
+    ${d.event ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">事件：${escapeHtml(d.event)}</p>` : ''}
+    <p style="font-size:14px;line-height:1.8;white-space:pre-wrap;">${escapeHtml(d.content)}</p>
+  `);
+}
+
+function viewRecipe(i){
+  const r = recipes[i];
+  if(!r) return;
+  const ingItems = (r.ingredients||[]).flatMap(g=>g.items||[]);
+  const ingHtml = ingItems.length
+    ? ingItems.map(it=>`<li>${escapeHtml(it.name)} ${escapeHtml(it.amount||'')}${escapeHtml(it.unit||'')}</li>`).join('')
+    : '<li>尚無食材</li>';
+  const stepItems = r.steps || [];
+  const stepHtml = stepItems.length
+    ? stepItems.map(s=>`<li style="margin-bottom:6px;">${escapeHtml(s.content)}</li>`).join('')
+    : '<li>尚無做法</li>';
+  openDetail(`
+    <div class="sheet-title" style="text-align:left;padding:0 0 10px;">${escapeHtml(r.name)}</div>
+    <p class="item-meta" style="margin-bottom:14px;">${r.category}${r.servings ? ' · ' + escapeHtml(r.servings) : ''}${r.prepTime ? ' · 準備 ' + escapeHtml(r.prepTime) : ''}${r.makeTime ? ' · 製作 ' + escapeHtml(r.makeTime) : ''}</p>
+    ${r.tags && r.tags.length ? `<div style="margin-bottom:12px;">${r.tags.map(t=>`<span class="tag active">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+    <p class="field-label">食材</p>
+    <ul style="font-size:14px;line-height:1.9;padding-left:18px;margin:0 0 14px;">${ingHtml}</ul>
+    <p class="field-label">做法</p>
+    <ol style="font-size:14px;line-height:1.9;padding-left:18px;margin:0 0 14px;">${stepHtml}</ol>
+    ${r.notes ? `<p class="field-label">備註</p><p style="font-size:13px;color:var(--muted);white-space:pre-wrap;">${escapeHtml(r.notes)}</p>` : ''}
+    ${r.sourceUrl ? `<p class="field-label" style="margin-top:10px;">來源</p><p style="font-size:13px;color:var(--blue);word-break:break-all;">${escapeHtml(r.sourceUrl)}</p>` : ''}
+  `);
+}
+
+function updateShukuBanners(){
+  const loggedIn = !!window.shukuUid;
+  const diaryBanner = document.getElementById('diary-login-banner');
+  const recipeBanner = document.getElementById('recipe-login-banner');
+  if (diaryBanner) diaryBanner.style.display = loggedIn ? 'none' : 'block';
+  if (recipeBanner) recipeBanner.style.display = loggedIn ? 'none' : 'block';
+}
+
 function renderAll(){
+  updateShukuBanners();
   document.getElementById('today-date').textContent =
     new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
 
@@ -789,12 +863,13 @@ function renderAll(){
   document.getElementById('diary-tags-picker').innerHTML = diaryTags.map(t=>`
     <span class="chip ${selectedDiaryTags.includes(t)?'sel':''}" onclick="toggleDiaryTag('${t}')">${t}</span>`).join('');
 
-  document.getElementById('diary-list').innerHTML = diaryEntries.map(d=>`
-    <div class="list-item">
+  document.getElementById('diary-list').innerHTML = diaryEntries.map((d,i)=>`
+    <div class="list-item" style="cursor:pointer;" onclick="viewDiary(${i})">
       <div style="flex:1;">
         <span class="item-title" style="display:block;">${d.title}</span>
         <span class="item-meta">${d.date} · ${d.category}${d.tags.length ? ' · ' + d.tags.join(', ') : ''}</span>
       </div>
+      <i class="ti ti-chevron-right" style="color:var(--muted);"></i>
     </div>`).join('') || '<div class="empty">尚無日記</div>';
 
   document.getElementById('recipe-category-picker').innerHTML = recipeCategories.map(c=>`
@@ -802,12 +877,13 @@ function renderAll(){
   document.getElementById('recipe-tags-picker').innerHTML = recipeTags.map(t=>`
     <span class="chip ${selectedRecipeTags.includes(t)?'sel':''}" onclick="toggleRecipeTag('${t}')">${t}</span>`).join('');
 
-  document.getElementById('recipe-list').innerHTML = recipes.map(r=>`
-    <div class="list-item">
+  document.getElementById('recipe-list').innerHTML = recipes.map((r,i)=>`
+    <div class="list-item" style="cursor:pointer;" onclick="viewRecipe(${i})">
       <div style="flex:1;">
         <span class="item-title" style="display:block;">${r.name}</span>
         <span class="item-meta">${r.category}${r.servings ? ' · ' + r.servings : ''}${r.tags.length ? ' · ' + r.tags.join(', ') : ''}</span>
       </div>
+      <i class="ti ti-chevron-right" style="color:var(--muted);"></i>
     </div>`).join('') || '<div class="empty">尚無食譜</div>';
 
   document.getElementById('review-todo').textContent = todos.filter(t=>t.done).length;
@@ -819,7 +895,7 @@ function renderAll(){
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js");
   const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } =
     await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js");
-  const { getFirestore, doc, onSnapshot, collection, query, where } =
+  const { getFirestore, doc, onSnapshot, collection, query, where, addDoc } =
     await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js");
 
   const firebaseConfig = {
@@ -858,6 +934,7 @@ function renderAll(){
     if (allTags.size) diaryTags = orderNames([...allTags], diaryMetaCache.tagOrder);
     if (!diaryCategories.includes(selectedDiaryCategory)) selectedDiaryCategory = diaryCategories[0];
     selectedDiaryTags = selectedDiaryTags.filter(t=>diaryTags.includes(t));
+    diaryEntries = [...diaryEntriesCache].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     renderAll();
   }
   function recomputeRecipeSync(){
@@ -869,6 +946,7 @@ function renderAll(){
     if (allTags.size) recipeTags = orderNames([...allTags], recipeMetaCache.tagOrder);
     if (!recipeCategories.includes(selectedRecipeCategory)) selectedRecipeCategory = recipeCategories[0];
     selectedRecipeTags = selectedRecipeTags.filter(t=>recipeTags.includes(t));
+    recipes = [...recipesCache].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     renderAll();
   }
 
@@ -886,6 +964,15 @@ function renderAll(){
     signInWithPopup(fbAuth, provider).catch(err => alert("登入失敗：" + (err.message || err)));
   };
 
+  window.shukuSaveDiary = async function(entry){
+    if (!window.shukuUid) throw new Error("尚未登入藏書閣");
+    await addDoc(collection(fbDb, "diaryEntries"), { ...entry, uid: window.shukuUid });
+  };
+  window.shukuSaveRecipe = async function(recipe){
+    if (!window.shukuUid) throw new Error("尚未登入藏書閣");
+    await addDoc(collection(fbDb, "recipes"), { ...recipe, uid: window.shukuUid });
+  };
+
   onAuthStateChanged(fbAuth, (user) => {
     const btn = document.getElementById('shuku-sync-btn');
     if (user && ALLOWED_EMAIL && user.email !== ALLOWED_EMAIL) {
@@ -894,12 +981,15 @@ function renderAll(){
       return;
     }
     if (user) {
+      window.shukuUid = user.uid;
       if (btn) btn.textContent = '已同步藏書閣（' + user.email + '）';
       startShukuSync(user.uid);
     } else {
-      if (btn) btn.textContent = '登入同步藏書閣分類標籤';
+      window.shukuUid = null;
+      if (btn) btn.textContent = '登入同步藏書閣帳號';
       stopShukuSync();
     }
+    updateShukuBanners();
   });
 })();
 
