@@ -141,6 +141,7 @@
   <h1>吾觀景耀</h1>
   <p class="sub">DAILY · WORK · LIFE</p>
   <div id="nav-list"></div>
+  <button type="button" id="shuku-sync-btn" class="import-btn" style="width:100%;margin-top:16px;" onclick="syncWithShuku()">登入同步藏書閣分類標籤</button>
 </div>
 
 <section class="page active" data-page="home">
@@ -366,9 +367,8 @@ let diaryEntries = [];
 let recipes = [];
 let selectedTag = null;
 
-// 以下分類／標籤清單之後串接藏書閣 Firebase 後，會改由 diaryMeta / recipeMeta
-// 文件（categoryOrder + manualCategories／tagOrder + manualTags）同步覆蓋，
-// 吾app 這邊只負責「點選」不負責「輸入」，目前先放預設清單頂替。
+// 以下分類／標籤清單為預設值；登入同步藏書閣後，會被 diaryMeta／recipeMeta
+// 與 diaryEntries／recipes（uid 篩選）的即時資料覆蓋，吾app 只負責唯讀點選。
 let diaryCategories = ['未分類','生活','工作','旅行','家庭'];
 let diaryTags = ['開心','低潮','紀錄','靈感'];
 let recipeCategories = ['未分類','家常菜','甜點','湯品','異國料理'];
@@ -690,6 +690,95 @@ function renderAll(){
   document.getElementById('review-todo').textContent = todos.filter(t=>t.done).length;
   document.getElementById('review-diary').textContent = diaryEntries.length;
 }
+
+// ---------- 與藏書閣 Firebase 唯讀同步分類／標籤 ----------
+(async function initShukuSync(){
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js");
+  const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } =
+    await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js");
+  const { getFirestore, doc, onSnapshot, collection, query, where } =
+    await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js");
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDkG-iHRYVLDtX6_H5EFJt4wlB2JH51xA8",
+    authDomain: "booksept.firebaseapp.com",
+    projectId: "booksept",
+    storageBucket: "booksept.firebasestorage.app",
+    messagingSenderId: "496792717845",
+    appId: "1:496792717845:web:2ddf2af5d69e61b8a7dc1c"
+  };
+  const ALLOWED_EMAIL = "hsinglinstar@gmail.com";
+
+  const fbApp = initializeApp(firebaseConfig);
+  const fbAuth = getAuth(fbApp);
+  const fbDb = getFirestore(fbApp);
+  const provider = new GoogleAuthProvider();
+
+  function orderNames(names, orderArr){
+    const idx = new Map((orderArr||[]).map((n,i)=>[n,i]));
+    const known = names.filter(n=>idx.has(n)).sort((a,b)=>idx.get(a)-idx.get(b));
+    const unknown = names.filter(n=>!idx.has(n)).sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+    return [...known, ...unknown];
+  }
+
+  let diaryMetaCache = { categoryOrder: [], manualCategories: [], tagOrder: [], manualTags: [] };
+  let recipeMetaCache = { categoryOrder: [], manualCategories: [], tagOrder: [], manualTags: [] };
+  let diaryEntriesCache = [];
+  let recipesCache = [];
+
+  function recomputeDiarySync(){
+    const usedCats = new Set(diaryEntriesCache.map(e=>e.category).filter(Boolean));
+    const usedTags = new Set(diaryEntriesCache.flatMap(e=>Array.isArray(e.tags)?e.tags:[]));
+    const allCats = new Set([...usedCats, ...(diaryMetaCache.manualCategories||[])]);
+    const allTags = new Set([...usedTags, ...(diaryMetaCache.manualTags||[])]);
+    if (allCats.size) diaryCategories = orderNames([...allCats], diaryMetaCache.categoryOrder);
+    if (allTags.size) diaryTags = orderNames([...allTags], diaryMetaCache.tagOrder);
+    if (!diaryCategories.includes(selectedDiaryCategory)) selectedDiaryCategory = diaryCategories[0];
+    selectedDiaryTags = selectedDiaryTags.filter(t=>diaryTags.includes(t));
+    renderAll();
+  }
+  function recomputeRecipeSync(){
+    const usedCats = new Set(recipesCache.map(r=>r.category).filter(Boolean));
+    const usedTags = new Set(recipesCache.flatMap(r=>Array.isArray(r.tags)?r.tags:[]));
+    const allCats = new Set([...usedCats, ...(recipeMetaCache.manualCategories||[])]);
+    const allTags = new Set([...usedTags, ...(recipeMetaCache.manualTags||[])]);
+    if (allCats.size) recipeCategories = orderNames([...allCats], recipeMetaCache.categoryOrder);
+    if (allTags.size) recipeTags = orderNames([...allTags], recipeMetaCache.tagOrder);
+    if (!recipeCategories.includes(selectedRecipeCategory)) selectedRecipeCategory = recipeCategories[0];
+    selectedRecipeTags = selectedRecipeTags.filter(t=>recipeTags.includes(t));
+    renderAll();
+  }
+
+  let unsubList = [];
+  function stopShukuSync(){ unsubList.forEach(u=>u()); unsubList = []; }
+  function startShukuSync(uid){
+    stopShukuSync();
+    unsubList.push(onSnapshot(doc(fbDb,"diaryMeta",uid), s=>{ diaryMetaCache = s.data() || diaryMetaCache; recomputeDiarySync(); }));
+    unsubList.push(onSnapshot(query(collection(fbDb,"diaryEntries"), where("uid","==",uid)), s=>{ diaryEntriesCache = s.docs.map(d=>d.data()); recomputeDiarySync(); }));
+    unsubList.push(onSnapshot(doc(fbDb,"recipeMeta",uid), s=>{ recipeMetaCache = s.data() || recipeMetaCache; recomputeRecipeSync(); }));
+    unsubList.push(onSnapshot(query(collection(fbDb,"recipes"), where("uid","==",uid)), s=>{ recipesCache = s.docs.map(d=>d.data()); recomputeRecipeSync(); }));
+  }
+
+  window.syncWithShuku = function(){
+    signInWithPopup(fbAuth, provider).catch(err => alert("登入失敗：" + (err.message || err)));
+  };
+
+  onAuthStateChanged(fbAuth, (user) => {
+    const btn = document.getElementById('shuku-sync-btn');
+    if (user && ALLOWED_EMAIL && user.email !== ALLOWED_EMAIL) {
+      alert("這個 Google 帳號沒有使用權限。");
+      signOut(fbAuth);
+      return;
+    }
+    if (user) {
+      if (btn) btn.textContent = '已同步藏書閣（' + user.email + '）';
+      startShukuSync(user.uid);
+    } else {
+      if (btn) btn.textContent = '登入同步藏書閣分類標籤';
+      stopShukuSync();
+    }
+  });
+})();
 
 renderNav('home');
 renderAll();
