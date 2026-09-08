@@ -818,8 +818,45 @@ function openDetail(html){
 function closeDetail(){ document.getElementById('detail-backdrop').classList.remove('open'); }
 function closeDetailBg(e){ if(e.target.id==='detail-backdrop') closeDetail(); }
 
+// 藏書閣同步過來的日記內容是真正的 HTML（例如 <ol><li>...</li></ol>），
+// 若偵測到內容本身已是 HTML 區塊，就直接淨化後輸出，而不是把 <tag> 當成純文字逐字顯示。
+function looksLikeHtml(text){
+  return /^\s*<(p|div|ol|ul|li|h[1-6]|blockquote|pre|span|strong|em|b|i|br)[\s\/>]/i.test(text);
+}
+function sanitizeHtml(html){
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const allowed = new Set(['P','DIV','OL','UL','LI','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','PRE','SPAN','STRONG','EM','B','I','BR','A','U','S']);
+  (function clean(node){
+    [...node.childNodes].forEach(child=>{
+      if(child.nodeType === 1){
+        if(!allowed.has(child.tagName)){
+          child.replaceWith(...child.childNodes);
+          return;
+        }
+        [...child.attributes].forEach(attr=>{
+          const name = attr.name.toLowerCase();
+          const val = attr.value.trim();
+          if(name.startsWith('on') || (name==='href' && /^\s*javascript:/i.test(val)) || (name!=='href' && name!=='style')){
+            child.removeAttribute(attr.name);
+          }
+        });
+        clean(child);
+      } else if(child.nodeType !== 3){
+        child.remove();
+      }
+    });
+  })(tpl.content);
+  return tpl.innerHTML;
+}
 function renderTextBlocks(text){
   if(!text) return '';
+  if(looksLikeHtml(text)){
+    const clean = sanitizeHtml(text);
+    return clean.trim()
+      ? `<div style="font-size:14px;line-height:1.8;">${clean}</div>`
+      : `<p style="font-size:14px;color:var(--muted);">（無內容）</p>`;
+  }
   const lines = text.split(/\r?\n/);
   let html = '', buffer = [], mode = null;
   function flush(){
