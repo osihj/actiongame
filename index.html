@@ -85,6 +85,22 @@
   .inline-form{display:none;}
   .inline-form.open{display:block;}
 
+  .editor-wrap{border:0.5px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;background:var(--bg);}
+  .editor-toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--bg);
+    border-bottom:0.5px solid var(--line);flex-wrap:wrap;}
+  .ed-btn{width:30px;height:30px;flex-shrink:0;border-radius:8px;border:none;background:transparent;
+    color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .ed-btn:hover{background:var(--white);}
+  .ed-btn i{font-size:16px;color:var(--muted);}
+  .ed-list-select{border:0.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;
+    background:var(--white);color:var(--ink);font-weight:600;}
+  .editor-body{min-height:110px;max-height:320px;overflow-y:auto;padding:10px 12px;font-size:14px;
+    line-height:1.7;background:var(--bg);outline:none;}
+  .editor-body[contenteditable]:empty:before{content:attr(data-placeholder);color:var(--muted);}
+  .editor-body ol,.editor-body ul{padding-left:20px;margin:6px 0;}
+  .editor-body h3{font-size:16px;margin:8px 0 4px;}
+  .editor-body p{margin:0 0 6px;}
+
   .chip-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
   .chip{padding:6px 14px;border-radius:999px;border:0.5px solid var(--line);font-size:12px;font-weight:600;
     color:var(--muted);cursor:pointer;background:var(--bg);}
@@ -299,7 +315,20 @@
     <p class="field-label">標籤</p>
     <div class="chip-picker" id="diary-tags-picker"></div>
     <input id="diary-event" placeholder="事件，例如：與朋友聚餐">
-    <textarea id="diary-content" placeholder="寫下今天發生的事...&#10;可用「1. 」開頭做編號清單，或「- 」開頭做項目清單" rows="4"></textarea>
+    <div class="editor-wrap">
+      <div class="editor-toolbar">
+        <button type="button" class="ed-btn" onmousedown="event.preventDefault()" onclick="diaryExec('bold')"><b>B</b></button>
+        <button type="button" class="ed-btn" onmousedown="event.preventDefault()" onclick="diaryExec('italic')"><i>I</i></button>
+        <button type="button" class="ed-btn" onmousedown="event.preventDefault()" onclick="diaryExec('heading')">H</button>
+        <button type="button" class="ed-btn" onmousedown="event.preventDefault()" onclick="diaryExec('list-toggle')"><i class="ti ti-list"></i></button>
+        <select class="ed-list-select" onmousedown="event.preventDefault()" onchange="diaryListSelect(this.value); this.selectedIndex=-1;">
+          <option value="" selected disabled hidden>清單樣式</option>
+          <option value="ul">項目清單</option>
+          <option value="ol">編號清單</option>
+        </select>
+      </div>
+      <div id="diary-content" class="editor-body" contenteditable="true" data-placeholder="寫下今天的心情、發生的事、想記錄的一切..."></div>
+    </div>
     <button class="save-btn" onclick="addDiary()">儲存</button>
   </div>
 </section>
@@ -665,11 +694,33 @@ function addNote(){
 }
 function filterTag(cat){ selectedTag = (selectedTag===cat) ? null : cat; renderAll(); }
 
+// ---------- 日記富文字編輯器（B / I / H / 項目清單・編號清單）----------
+function diaryExec(cmd){
+  const editor = document.getElementById('diary-content');
+  editor.focus();
+  if(cmd==='bold') document.execCommand('bold');
+  else if(cmd==='italic') document.execCommand('italic');
+  else if(cmd==='heading'){
+    const cur = (document.queryCommandValue('formatBlock')||'').toLowerCase();
+    document.execCommand('formatBlock', false, cur==='h3' ? 'p' : 'h3');
+  } else if(cmd==='list-toggle'){
+    document.execCommand('insertUnorderedList');
+  }
+}
+function diaryListSelect(type){
+  const editor = document.getElementById('diary-content');
+  editor.focus();
+  if(type==='ol') document.execCommand('insertOrderedList');
+  else if(type==='ul') document.execCommand('insertUnorderedList');
+}
+
 function addDiary(){
   const date = document.getElementById('diary-date').value || new Date().toISOString().slice(0,10);
   const title = document.getElementById('diary-title').value.trim();
-  const content = document.getElementById('diary-content').value.trim();
-  if(!title || !content) return;
+  const editor = document.getElementById('diary-content');
+  const plain = editor.textContent.trim();
+  if(!title || !plain) return;
+  const content = sanitizeHtml(editor.innerHTML.trim());
   const entry = {
     date,
     title,
@@ -688,7 +739,7 @@ function addDiary(){
   document.getElementById('diary-date').value='';
   document.getElementById('diary-title').value='';
   document.getElementById('diary-event').value='';
-  document.getElementById('diary-content').value='';
+  editor.innerHTML='';
   selectedDiaryCategory = diaryCategories[0];
   selectedDiaryTags = [];
   renderAll();
