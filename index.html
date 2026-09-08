@@ -3,108 +3,119 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>神來一筆</title>
+<title>希安的工作台</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
   :root{
-    --cream:#FAFAF7;
-    --line:#E8E6DE;
-    --green:#2F4A34;
-    --green-soft:#4A6B52;
-    --ink:#2F2C24;
-    --muted:#6B6559;
+    --bg:#F7F7F5;
+    --coral:#FF6F61;
+    --blue:#3E9AE0;
+    --yellow:#F4B400;
+    --orange:#F2994A;
+    --green:#3FA65C;
+    --pink:#E86AA6;
+    --purple:#8B7FD6;
+    --ink:#1F2937;
+    --muted:#8A8F98;
     --white:#FFFFFF;
+    --line:#E5E7EB;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;}
   body{max-width:420px;margin:0 auto;min-height:100vh;position:relative;overflow-x:hidden;}
-  .serif{font-family:Georgia,"Noto Serif TC",serif;}
 
-  /* top bar */
-  .topbar{display:flex;align-items:center;gap:12px;padding:16px;border-bottom:0.5px solid var(--line);
-    position:sticky;top:0;background:var(--cream);z-index:20;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:16px;background:var(--white);
+    position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line);}
   .topbar i{font-size:22px;color:var(--ink);cursor:pointer;}
-  .topbar span{font-size:16px;font-weight:500;}
+  .topbar span{font-size:17px;font-weight:700;color:var(--ink);}
+  .topbar .dot{width:6px;height:6px;border-radius:50%;background:var(--blue);}
 
-  /* drawer */
-  .backdrop{position:fixed;inset:0;background:rgba(47,44,36,0.35);z-index:29;
+  .backdrop{position:fixed;inset:0;background:rgba(20,40,60,0.4);z-index:29;
     opacity:0;pointer-events:none;transition:opacity .2s;}
   .backdrop.open{opacity:1;pointer-events:auto;}
   .drawer{position:fixed;top:0;left:0;bottom:0;width:78%;max-width:320px;background:var(--white);
     z-index:30;transform:translateX(-100%);transition:transform .25s;padding:24px 20px;overflow-y:auto;}
   .drawer.open{transform:translateX(0);}
-  .drawer h1{font-size:20px;margin:0 0 2px;font-weight:500;}
+  .drawer h1{font-size:20px;margin:0 0 2px;font-weight:800;color:var(--ink);}
   .drawer .sub{font-size:11px;letter-spacing:1px;color:var(--muted);margin:0 0 24px;}
-  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:10px;
-    color:var(--ink);cursor:pointer;font-size:15px;}
-  .nav-item i{font-size:19px;color:var(--muted);}
-  .nav-item.active{background:var(--green);color:var(--white);}
-  .nav-item.active i{color:var(--white);}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;
+    color:var(--ink);cursor:pointer;font-size:15px;font-weight:600;border:2px solid var(--line);
+    margin-bottom:10px;}
+  .nav-item .icobox{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0;}
+  .nav-item .icobox i{font-size:17px;color:var(--white);}
+  .nav-item span.label{flex:1;}
 
-  /* pages */
   .page{display:none;padding:20px 16px 100px;}
   .page.active{display:block;}
-  .eyebrow{font-size:11px;color:var(--muted);letter-spacing:1px;}
-  h2.title{font-family:Georgia,"Noto Serif TC",serif;font-size:26px;margin:6px 0 4px;font-weight:400;}
-  .date{font-size:13px;color:var(--muted);margin:0 0 20px;}
+  .eyebrow{font-size:11px;color:var(--blue);letter-spacing:1px;font-weight:700;}
+  h2.title{font-size:24px;margin:6px 0 4px;font-weight:800;color:var(--ink);}
+  .date{font-size:13px;color:var(--muted);margin:0 0 18px;}
 
-  .card{background:var(--white);border:0.5px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}
+  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .cat-item{text-align:center;cursor:pointer;}
+  .cat-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    margin:0 auto;box-shadow:0 4px 10px rgba(0,0,0,.12);}
+  .cat-circle i{font-size:24px;color:var(--white);}
+  .cat-item p{font-size:11px;margin:6px 0 0;color:var(--ink);font-weight:600;}
+
+  .card{background:var(--white);border-radius:18px;padding:16px;margin-bottom:12px;
+    box-shadow:0 3px 10px rgba(42,117,187,.08);}
   .row{display:flex;align-items:center;justify-content:space-between;}
-  .list-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--line);}
+  .list-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);}
   .list-item:last-child{border-bottom:none;}
-  .check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--green-soft);flex-shrink:0;cursor:pointer;
+  .check{width:22px;height:22px;border-radius:50%;border:2px solid var(--blue);flex-shrink:0;cursor:pointer;
     display:flex;align-items:center;justify-content:center;}
   .check.done{background:var(--green);border-color:var(--green);}
   .check.done i{color:var(--white);font-size:13px;}
-  .item-title{font-size:14px;flex:1;}
+  .item-title{font-size:14px;flex:1;font-weight:600;}
   .item-title.done{text-decoration:line-through;color:var(--muted);}
   .item-meta{font-size:12px;color:var(--muted);}
 
-  .tag{display:inline-block;font-size:12px;padding:5px 12px;border-radius:999px;border:0.5px solid var(--line);
-    color:var(--muted);margin:0 6px 6px 0;cursor:pointer;}
-  .tag.active{background:var(--green);color:var(--white);border-color:var(--green);}
+  .tag{display:inline-block;font-size:12px;padding:6px 14px;border-radius:999px;border:2px solid var(--line);
+    color:var(--blue);margin:0 6px 6px 0;cursor:pointer;font-weight:700;}
+  .tag.active{background:var(--yellow);color:var(--ink);border-color:var(--yellow);}
 
-  .add-btn{width:100%;padding:12px;border-radius:10px;border:0.5px dashed var(--green-soft);background:transparent;
-    color:var(--green);font-size:14px;cursor:pointer;margin-bottom:16px;}
-  input,textarea{width:100%;padding:10px 12px;border-radius:8px;border:0.5px solid var(--line);
-    background:var(--cream);font-size:14px;margin-bottom:10px;font-family:inherit;color:var(--ink);}
-  .save-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:var(--white);
-    font-size:14px;cursor:pointer;}
+  .add-btn{width:100%;padding:12px;border-radius:999px;border:2px dashed var(--blue);background:var(--white);
+    color:var(--blue);font-size:14px;cursor:pointer;margin-bottom:16px;font-weight:700;}
+  input,textarea{width:100%;padding:10px 12px;border-radius:12px;border:2px solid var(--line);
+    background:var(--bg);font-size:14px;margin-bottom:10px;font-family:inherit;color:var(--ink);}
+  .save-btn{width:100%;padding:12px;border-radius:999px;border:none;background:var(--coral);color:var(--white);
+    font-size:14px;cursor:pointer;font-weight:700;}
   .inline-form{display:none;}
   .inline-form.open{display:block;}
 
   .mood-row{display:flex;gap:8px;margin-bottom:16px;}
-  .mood{flex:1;text-align:center;padding:12px 4px;border-radius:10px;border:0.5px solid var(--line);cursor:pointer;}
-  .mood.sel{background:var(--green);border-color:var(--green);}
-  .mood.sel i,.mood.sel span{color:var(--white);}
+  .mood{flex:1;text-align:center;padding:12px 4px;border-radius:14px;border:2px solid var(--line);cursor:pointer;}
+  .mood.sel{background:var(--yellow);border-color:var(--yellow);}
+  .mood.sel i,.mood.sel span{color:var(--ink);}
   .mood i{font-size:20px;color:var(--muted);}
-  .mood span{display:block;font-size:11px;color:var(--muted);margin-top:4px;}
+  .mood span{display:block;font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
-  .stat{background:var(--white);border:0.5px solid var(--line);border-radius:12px;padding:14px;}
-  .stat .n{font-size:22px;font-weight:500;}
-  .stat .l{font-size:12px;color:var(--muted);}
+  .stat{background:var(--white);border-radius:16px;padding:14px;box-shadow:0 3px 10px rgba(42,117,187,.08);}
+  .stat .n{font-size:22px;font-weight:800;color:var(--blue);}
+  .stat .l{font-size:12px;color:var(--muted);font-weight:600;}
 
-  .fab{position:fixed;right:24px;bottom:28px;width:56px;height:56px;border-radius:50%;background:var(--green);
+  .fab{position:fixed;right:24px;bottom:28px;width:58px;height:58px;border-radius:50%;background:var(--yellow);
     display:flex;align-items:center;justify-content:center;z-index:15;cursor:pointer;
-    box-shadow:0 4px 14px rgba(47,74,52,.35);}
-  .fab i{color:var(--white);font-size:24px;}
+    box-shadow:0 4px 14px rgba(255,203,5,.5);}
+  .fab i{color:var(--ink);font-size:26px;}
 
-  .sheet-backdrop{position:fixed;inset:0;background:rgba(47,44,36,0.35);z-index:39;opacity:0;pointer-events:none;
+  .sheet-backdrop{position:fixed;inset:0;background:rgba(20,40,60,0.4);z-index:39;opacity:0;pointer-events:none;
     transition:opacity .2s;display:flex;align-items:flex-end;justify-content:center;}
   .sheet-backdrop.open{opacity:1;pointer-events:auto;}
-  .sheet{width:100%;max-width:420px;background:#FAFAF7;border-radius:20px 20px 0 0;border:0.5px solid var(--line);
-    transform:translateY(100%);transition:transform .25s;}
+  .sheet{width:100%;max-width:420px;background:var(--white);border-radius:24px 24px 0 0;}
   .sheet-backdrop.open .sheet{transform:translateY(0);}
-  .sheet-title{text-align:center;font-family:Georgia,"Noto Serif TC",serif;font-size:18px;padding:20px 0 12px;}
-  .qgrid{display:grid;grid-template-columns:repeat(3,1fr);border-top:0.5px solid var(--line);}
-  .qcell{text-align:center;padding:24px 4px;border-right:0.5px solid var(--line);border-bottom:0.5px solid var(--line);
-    cursor:pointer;}
-  .qgrid .qcell:nth-child(3n){border-right:none;}
-  .qgrid .qcell:nth-child(n+4){border-bottom:none;}
-  .qcell i{font-size:28px;color:var(--green-soft);}
-  .qcell p{font-size:12px;margin:10px 0 0;color:var(--muted);}
+  .sheet{transform:translateY(100%);transition:transform .25s;}
+  .sheet-title{text-align:center;font-size:17px;font-weight:800;padding:20px 0 12px;color:var(--ink);}
+  .qgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 20px 24px;}
+  .qcell{text-align:center;cursor:pointer;}
+  .qcircle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    margin:0 auto;box-shadow:0 4px 10px rgba(0,0,0,.12);}
+  .qcircle i{font-size:24px;color:var(--white);}
+  .qcell p{font-size:12px;margin:8px 0 0;color:var(--ink);font-weight:700;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
 </style>
 </head>
@@ -112,7 +123,9 @@
 
 <div class="topbar">
   <i class="ti ti-menu-2" onclick="toggleDrawer(true)"></i>
-  <span id="topbar-title">首頁</span>
+  <span class="dot"></span>
+  <span id="topbar-title" style="flex:1;text-align:center;">首頁</span>
+  <span class="dot"></span>
 </div>
 
 <div class="backdrop" id="backdrop" onclick="toggleDrawer(false)"></div>
@@ -122,27 +135,24 @@
   <div id="nav-list"></div>
 </div>
 
-<!-- 首頁 -->
 <section class="page active" data-page="home">
   <p class="eyebrow">TODAY</p>
-  <h2 class="title">日日是好日。</h2>
   <p class="date" id="today-date"></p>
   <div class="card">
     <div class="row" style="margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:500;">今日待辦</span>
+      <span style="font-size:14px;font-weight:700;">今日待辦</span>
       <span class="item-meta" id="home-todo-count"></span>
     </div>
     <div id="home-todo-list"></div>
   </div>
   <div class="card">
     <div class="row" style="margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:500;">習慣打卡</span>
+      <span style="font-size:14px;font-weight:700;">習慣打卡</span>
     </div>
     <div id="home-habit-list"></div>
   </div>
 </section>
 
-<!-- 日程與待辦 -->
 <section class="page" data-page="todo">
   <p class="eyebrow">SCHEDULE</p>
   <h2 class="title">日程與待辦</h2>
@@ -155,7 +165,6 @@
   <div class="card"><div id="todo-list"></div></div>
 </section>
 
-<!-- 習慣 -->
 <section class="page" data-page="habit">
   <p class="eyebrow">HABITS</p>
   <h2 class="title">習慣</h2>
@@ -168,14 +177,12 @@
   <div class="card"><div id="habit-list"></div></div>
 </section>
 
-<!-- 工作 -->
 <section class="page" data-page="work">
   <p class="eyebrow">WORK</p>
   <h2 class="title">工作</h2>
   <div class="card"><div class="empty">尚未規劃工作專案，先從「日程與待辦」記錄工作事項即可。</div></div>
 </section>
 
-<!-- 健康 -->
 <section class="page" data-page="health">
   <p class="eyebrow">HEALTH</p>
   <h2 class="title">健康</h2>
@@ -186,7 +193,6 @@
   <div class="card"><div class="empty">運動與睡眠紀錄會從快速紀錄自動累積到這裡。</div></div>
 </section>
 
-<!-- 記帳 -->
 <section class="page" data-page="budget">
   <p class="eyebrow">BUDGET</p>
   <h2 class="title">記帳</h2>
@@ -198,14 +204,13 @@
   </div>
   <div class="card">
     <div class="row" style="margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:500;">本月支出</span>
-      <span style="font-size:18px;font-weight:500;" id="budget-total">$0</span>
+      <span style="font-size:14px;font-weight:700;">本月支出</span>
+      <span style="font-size:18px;font-weight:800;color:var(--blue);" id="budget-total">$0</span>
     </div>
     <div id="budget-list"></div>
   </div>
 </section>
 
-<!-- 知識庫 -->
 <section class="page" data-page="knowledge">
   <p class="eyebrow">KNOWLEDGE</p>
   <h2 class="title">知識庫</h2>
@@ -220,12 +225,11 @@
   <div class="card"><div id="knowledge-list"></div></div>
 </section>
 
-<!-- 日記 -->
 <section class="page" data-page="diary">
   <p class="eyebrow">DIARY</p>
   <h2 class="title">日記</h2>
   <div class="card">
-    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">今天的心情</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px;font-weight:600;">今天的心情</p>
     <div class="mood-row" id="mood-row"></div>
     <textarea id="diary-text" placeholder="寫下今天發生的事..." rows="3"></textarea>
     <button class="save-btn" onclick="addDiary()">儲存</button>
@@ -233,7 +237,6 @@
   <div class="card"><div id="diary-list"></div></div>
 </section>
 
-<!-- 回顧 -->
 <section class="page" data-page="review">
   <p class="eyebrow">REVIEW</p>
   <h2 class="title">回顧</h2>
@@ -244,7 +247,6 @@
   <div class="card"><div class="empty">累積更多紀錄後，這裡會顯示每週／每月趨勢。</div></div>
 </section>
 
-<!-- 設定 -->
 <section class="page" data-page="settings">
   <p class="eyebrow">SETTINGS</p>
   <h2 class="title">設定</h2>
@@ -261,28 +263,28 @@
   <div class="sheet">
     <div class="sheet-title">快速紀錄</div>
     <div class="qgrid">
-      <div class="qcell" onclick="quickAction('exercise')"><i class="ti ti-barbell"></i><p>運動</p></div>
-      <div class="qcell" onclick="quickAction('budget')"><i class="ti ti-wallet"></i><p>記帳</p></div>
-      <div class="qcell" onclick="quickAction('mood')"><i class="ti ti-mood-smile"></i><p>心情</p></div>
-      <div class="qcell" onclick="quickAction('note')"><i class="ti ti-pencil"></i><p>隨手記</p></div>
-      <div class="qcell" onclick="quickAction('todo')"><i class="ti ti-check"></i><p>待辦</p></div>
-      <div class="qcell" onclick="quickAction('knowledge')"><i class="ti ti-books"></i><p>長知識</p></div>
+      <div class="qcell" onclick="quickAction('exercise')"><div class="qcircle" style="background:var(--coral);"><i class="ti ti-barbell"></i></div><p>運動</p></div>
+      <div class="qcell" onclick="quickAction('budget')"><div class="qcircle" style="background:var(--yellow);"><i class="ti ti-wallet" style="color:var(--ink);"></i></div><p>記帳</p></div>
+      <div class="qcell" onclick="quickAction('mood')"><div class="qcircle" style="background:var(--green);"><i class="ti ti-mood-smile"></i></div><p>心情</p></div>
+      <div class="qcell" onclick="quickAction('note')"><div class="qcircle" style="background:var(--blue);"><i class="ti ti-pencil"></i></div><p>隨手記</p></div>
+      <div class="qcell" onclick="quickAction('todo')"><div class="qcircle" style="background:var(--coral);"><i class="ti ti-check"></i></div><p>待辦</p></div>
+      <div class="qcell" onclick="quickAction('knowledge')"><div class="qcircle" style="background:var(--blue);"><i class="ti ti-books"></i></div><p>長知識</p></div>
     </div>
   </div>
 </div>
 
 <script>
 const NAV = [
-  {id:'home', label:'首頁', icon:'ti-home'},
-  {id:'todo', label:'日程與待辦', icon:'ti-calendar'},
-  {id:'habit', label:'習慣', icon:'ti-flame'},
-  {id:'work', label:'工作', icon:'ti-briefcase'},
-  {id:'health', label:'健康', icon:'ti-heart'},
-  {id:'budget', label:'記帳', icon:'ti-wallet'},
-  {id:'knowledge', label:'知識庫', icon:'ti-books'},
-  {id:'diary', label:'日記', icon:'ti-feather'},
-  {id:'review', label:'回顧', icon:'ti-chart-bar'},
-  {id:'settings', label:'設定', icon:'ti-settings'},
+  {id:'home', label:'首頁', icon:'ti-home', color:'var(--blue)'},
+  {id:'todo', label:'日程與待辦', icon:'ti-calendar', color:'var(--coral)'},
+  {id:'habit', label:'習慣', icon:'ti-flame', color:'var(--yellow)'},
+  {id:'work', label:'工作', icon:'ti-briefcase', color:'var(--purple)'},
+  {id:'health', label:'健康', icon:'ti-heart', color:'var(--orange)'},
+  {id:'budget', label:'記帳', icon:'ti-wallet', color:'var(--green)'},
+  {id:'knowledge', label:'知識庫', icon:'ti-books', color:'var(--blue)'},
+  {id:'diary', label:'日記', icon:'ti-feather', color:'var(--pink)'},
+  {id:'review', label:'回顧', icon:'ti-chart-bar', color:'var(--purple)'},
+  {id:'settings', label:'設定', icon:'ti-settings', color:'var(--muted)'},
 ];
 
 let todos = [
@@ -313,8 +315,10 @@ let selectedTag = null;
 function renderNav(activeId){
   const el = document.getElementById('nav-list');
   el.innerHTML = NAV.map(n => `
-    <div class="nav-item ${n.id===activeId?'active':''}" onclick="switchPage('${n.id}')">
-      <i class="ti ${n.icon}"></i><span>${n.label}</span>
+    <div class="nav-item" style="border-color:${n.color};${n.id===activeId?`background:color-mix(in srgb, ${n.color} 12%, white);`:''}" onclick="switchPage('${n.id}')">
+      <div class="icobox" style="background:${n.color};"><i class="ti ${n.icon}"></i></div>
+      <span class="label">${n.label}</span>
+      <i class="ti ti-chevron-right" style="font-size:16px;color:var(--muted);"></i>
     </div>`).join('');
 }
 
@@ -420,7 +424,6 @@ function renderAll(){
   document.getElementById('today-date').textContent =
     new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
 
-  // home
   document.getElementById('home-todo-count').textContent =
     todos.filter(t=>!t.done).length + ' 項未完成';
   document.getElementById('home-todo-list').innerHTML = todos.slice(0,3).map((t,i)=>`
@@ -436,7 +439,6 @@ function renderAll(){
       <span class="item-meta">連續 ${h.streak} 天</span>
     </div>`).join('') || '<div class="empty">尚未建立習慣</div>';
 
-  // todo page
   document.getElementById('todo-list').innerHTML = todos.map((t,i)=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
@@ -444,7 +446,6 @@ function renderAll(){
       <span class="item-meta">${t.due}</span>
     </div>`).join('') || '<div class="empty">目前沒有待辦</div>';
 
-  // habit page
   document.getElementById('habit-list').innerHTML = habits.map((h,i)=>`
     <div class="list-item">
       <div class="check ${h.doneToday?'done':''}" onclick="toggleHabit(${i})">${fmtCheck(h.doneToday)}</div>
@@ -452,10 +453,8 @@ function renderAll(){
       <span class="item-meta">${h.freq} · 連續 ${h.streak} 天</span>
     </div>`).join('') || '<div class="empty">尚未建立重複計畫</div>';
 
-  // health
   document.getElementById('health-exercise').textContent = habits.reduce((a,h)=>a+(h.streak>0?1:0),0);
 
-  // budget
   const total = expenses.reduce((a,e)=>a+e.amount,0);
   document.getElementById('budget-total').textContent = '$' + total.toLocaleString();
   document.getElementById('budget-list').innerHTML = expenses.map(e=>`
@@ -464,7 +463,6 @@ function renderAll(){
       <span class="item-meta">$${e.amount.toLocaleString()}</span>
     </div>`).join('') || '<div class="empty">尚無支出紀錄</div>';
 
-  // knowledge
   const cats = [...new Set(notes.map(n=>n.cat))];
   document.getElementById('knowledge-tags').innerHTML = cats.map(c=>`
     <span class="tag ${selectedTag===c?'active':''}" onclick="filterTag('${c}')">${c}</span>`).join('');
@@ -475,7 +473,6 @@ function renderAll(){
       <span class="item-meta">${n.cat}</span>
     </div>`).join('') || '<div class="empty">尚無筆記</div>';
 
-  // diary
   document.getElementById('mood-row').innerHTML = moods.map((m,i)=>`
     <div class="mood ${selectedMood===i?'sel':''}" onclick="selectMood(${i})">
       <i class="ti ${m.icon}"></i><span>${m.label}</span>
@@ -486,7 +483,6 @@ function renderAll(){
       <span class="item-meta">${d.mood}</span>
     </div>`).join('') || '<div class="empty">尚無日記</div>';
 
-  // review
   document.getElementById('review-todo').textContent = todos.filter(t=>t.done).length;
   document.getElementById('review-diary').textContent = diaryEntries.length;
 }
