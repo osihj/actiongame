@@ -125,6 +125,26 @@
   .qcell i{font-size:28px;color:var(--green-soft);}
   .qcell p{font-size:12px;margin:10px 0 0;color:var(--muted);}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
+
+  .cal-toggle{display:flex;gap:6px;margin-bottom:12px;}
+  .cal-toggle-btn{flex:1;padding:8px;border-radius:999px;border:0.5px solid var(--line);
+    background:var(--bg);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;}
+  .cal-toggle-btn.active{background:var(--green);border-color:var(--green);color:var(--white);}
+  .cal-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px;}
+  .cal-nav i{font-size:18px;color:var(--muted);cursor:pointer;}
+  .cal-nav span{font-size:14px;font-weight:800;color:var(--ink);min-width:96px;text-align:center;}
+  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;
+    font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-day{position:relative;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;border-radius:12px;cursor:pointer;font-size:13px;color:var(--ink);}
+  .cal-day.other-month{color:var(--line);}
+  .cal-day.today{font-weight:800;color:var(--green);}
+  .cal-day.selected{background:var(--green);color:var(--white);}
+  .cal-day.selected.today{color:var(--white);}
+  .cal-day .dot{position:absolute;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--coral);}
+  .cal-day.selected .dot{background:var(--white);}
+  .cal-grid.week-mode{grid-template-rows:auto;}
 </style>
 </head>
 <body>
@@ -156,50 +176,50 @@
   </div>
   <div class="card">
     <div class="row" style="margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:700;">習慣打卡</span>
+      <span style="font-size:14px;font-weight:700;">今日行程</span>
     </div>
-    <div id="home-habit-list"></div>
+    <div id="home-schedule-list"></div>
   </div>
 </section>
 
 <section class="page" data-page="todo">
   <p class="eyebrow">SCHEDULE</p>
   <h2 class="title">日程與待辦</h2>
+
+  <div class="card" style="padding:14px;">
+    <div class="cal-toggle">
+      <button type="button" class="cal-toggle-btn" id="cal-view-month" onclick="setCalendarView('month')">月曆</button>
+      <button type="button" class="cal-toggle-btn" id="cal-view-week" onclick="setCalendarView('week')">週曆</button>
+    </div>
+    <div class="cal-nav">
+      <i class="ti ti-chevron-left" onclick="calendarNav(-1)"></i>
+      <span id="cal-nav-label"></span>
+      <i class="ti ti-chevron-right" onclick="calendarNav(1)"></i>
+    </div>
+    <div class="cal-weekdays" id="cal-weekdays"></div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
   <button class="add-btn" onclick="toggleForm('todo-form')">+ 新增待辦</button>
   <div class="inline-form card" id="todo-form">
     <input id="todo-title" placeholder="標題，例如：交週報">
-    <input id="todo-due" placeholder="截止日期，例如：2026/09/15">
+    <input id="todo-due" type="date">
     <button class="save-btn" onclick="addTodo()">儲存</button>
   </div>
-  <div class="card"><div id="todo-list"></div></div>
-</section>
 
-<section class="page" data-page="habit">
-  <p class="eyebrow">HABITS</p>
-  <h2 class="title">習慣</h2>
-  <button class="add-btn" onclick="toggleForm('habit-form')">+ 新增重複計畫</button>
-  <div class="inline-form card" id="habit-form">
-    <input id="habit-title" placeholder="標題，例如：每週三次運動">
-    <input id="habit-freq" placeholder="頻率，例如：每週三次">
-    <button class="save-btn" onclick="addHabit()">儲存</button>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px;">
+      <span style="font-size:14px;font-weight:700;" id="todo-list-label">待辦清單</span>
+      <span class="item-meta" id="todo-list-clear" style="cursor:pointer;display:none;" onclick="clearTodoDateFilter()">顯示全部</span>
+    </div>
+    <div id="todo-list"></div>
   </div>
-  <div class="card"><div id="habit-list"></div></div>
 </section>
 
 <section class="page" data-page="work">
   <p class="eyebrow">WORK</p>
   <h2 class="title">工作</h2>
   <div class="card"><div class="empty">尚未規劃工作專案，先從「日程與待辦」記錄工作事項即可。</div></div>
-</section>
-
-<section class="page" data-page="health">
-  <p class="eyebrow">HEALTH</p>
-  <h2 class="title">健康</h2>
-  <div class="stat-grid">
-    <div class="stat"><div class="n" id="health-sleep">--</div><div class="l">昨晚睡眠</div></div>
-    <div class="stat"><div class="n" id="health-exercise">0</div><div class="l">本週運動次數</div></div>
-  </div>
-  <div class="card"><div class="empty">運動與睡眠紀錄會從快速紀錄自動累積到這裡。</div></div>
 </section>
 
 <section class="page" data-page="budget">
@@ -266,10 +286,10 @@
     <input id="recipe-make-time" placeholder="製作時間，例如：15 分鐘">
 
     <div class="import-row">
-      <button type="button" class="import-btn" id="recipe-import-ingredients-btn">貼上食材清單匯入</button>
+      <button type="button" class="import-btn" id="recipe-import-ingredients-btn">自動貼上匯入食材</button>
     </div>
     <div class="import-panel" id="recipe-import-ingredients-panel" hidden>
-      <p class="field-label">每行一項食材，例如「雞胸肉 300克」，貼上後按「解析並帶入」</p>
+      <p class="field-label">若無法讀取剪貼簿權限，請在此手動貼上，每行一項食材，例如「雞胸肉 300克」</p>
       <textarea id="recipe-import-ingredients-input" rows="5" placeholder="雞胸肉 300克&#10;洋蔥 1顆&#10;醬油 2大匙&#10;鹽 少許"></textarea>
       <div class="import-panel-actions">
         <button type="button" id="recipe-import-ingredients-cancel">取消</button>
@@ -279,10 +299,10 @@
     <textarea id="recipe-ingredients" placeholder="食材，一行一項，格式：名稱,份量,單位&#10;例如：番茄,2,顆" rows="3"></textarea>
 
     <div class="import-row">
-      <button type="button" class="import-btn" id="recipe-import-steps-btn">貼上做法匯入</button>
+      <button type="button" class="import-btn" id="recipe-import-steps-btn">自動貼上匯入做法</button>
     </div>
     <div class="import-panel" id="recipe-import-steps-panel" hidden>
-      <p class="field-label">每行（或每個編號）算一個步驟，例如「1. 雞胸肉切塊」，貼上後按「解析並帶入」</p>
+      <p class="field-label">若無法讀取剪貼簿權限，請在此手動貼上，每行（或每個編號）算一個步驟，例如「1. 雞胸肉切塊」</p>
       <textarea id="recipe-import-steps-input" rows="5" placeholder="1. 雞胸肉切塊，醃15分鐘&#10;2. 洋蔥切絲爆香&#10;3. 下雞肉拌炒至熟"></textarea>
       <div class="import-panel-actions">
         <button type="button" id="recipe-import-steps-cancel">取消</button>
@@ -324,9 +344,9 @@
   <div class="sheet">
     <div class="sheet-title">快速紀錄</div>
     <div class="qgrid">
-      <div class="qcell" onclick="quickAction('exercise')"><i class="ti ti-barbell"></i><p>運動</p></div>
       <div class="qcell" onclick="quickAction('budget')"><i class="ti ti-wallet"></i><p>記帳</p></div>
       <div class="qcell" onclick="quickAction('diary')"><i class="ti ti-feather"></i><p>日記</p></div>
+      <div class="qcell" onclick="quickAction('recipe')"><i class="ti ti-tools-kitchen-2"></i><p>食譜</p></div>
       <div class="qcell" onclick="quickAction('note')"><i class="ti ti-pencil"></i><p>隨手記</p></div>
       <div class="qcell" onclick="quickAction('todo')"><i class="ti ti-check"></i><p>待辦</p></div>
       <div class="qcell" onclick="quickAction('knowledge')"><i class="ti ti-books"></i><p>長知識</p></div>
@@ -338,9 +358,7 @@
 const NAV = [
   {id:'home', label:'首頁', icon:'ti-home', color:'var(--blue)'},
   {id:'todo', label:'日程與待辦', icon:'ti-calendar', color:'var(--coral)'},
-  {id:'habit', label:'習慣', icon:'ti-flame', color:'var(--yellow)'},
   {id:'work', label:'工作', icon:'ti-briefcase', color:'var(--purple)'},
-  {id:'health', label:'健康', icon:'ti-heart', color:'var(--orange)'},
   {id:'budget', label:'記帳', icon:'ti-wallet', color:'var(--green)'},
   {id:'knowledge', label:'知識庫', icon:'ti-books', color:'var(--blue)'},
   {id:'diary', label:'日記', icon:'ti-feather', color:'var(--pink)'},
@@ -349,12 +367,15 @@ const NAV = [
   {id:'settings', label:'設定', icon:'ti-settings', color:'var(--muted)'},
 ];
 
+function isoToday(offsetDays){
+  const d = new Date();
+  d.setDate(d.getDate() + (offsetDays||0));
+  return d.toISOString().slice(0,10);
+}
 let todos = [
-  {title:'交專案週報', due:'09/10', done:false},
-  {title:'回覆客戶信件', due:'09/09', done:true},
-];
-let habits = [
-  {title:'每週三次運動', freq:'每週三次', streak:4, doneToday:false},
+  {title:'交專案週報', due:isoToday(2), done:false},
+  {title:'回覆客戶信件', due:isoToday(1), done:true},
+  {title:'整理會議紀錄', due:isoToday(0), done:false},
 ];
 let expenses = [
   {title:'午餐', amount:120},
@@ -421,10 +442,11 @@ function closeSheetBg(e){ if(e.target.id==='sheet-backdrop') closeSheet(); }
 
 function quickAction(type){
   closeSheet();
-  const map = {exercise:'health', budget:'budget', diary:'diary', note:'knowledge', todo:'todo', knowledge:'knowledge'};
+  const map = {budget:'budget', diary:'diary', recipe:'recipe', note:'knowledge', todo:'todo', knowledge:'knowledge'};
   switchPage(map[type]);
   if(type==='budget') toggleForm('budget-form');
   if(type==='todo') toggleForm('todo-form');
+  if(type==='recipe') toggleForm('recipe-form');
   if(type==='knowledge') toggleForm('knowledge-form');
   if(type==='note'){
     toggleForm('knowledge-form');
@@ -434,9 +456,9 @@ function quickAction(type){
 
 function addTodo(){
   const t = document.getElementById('todo-title').value.trim();
-  const d = document.getElementById('todo-due').value.trim();
+  const d = document.getElementById('todo-due').value;
   if(!t) return;
-  todos.push({title:t, due:d||'未設定', done:false});
+  todos.push({title:t, due:d||isoToday(0), done:false});
   document.getElementById('todo-title').value='';
   document.getElementById('todo-due').value='';
   toggleForm('todo-form');
@@ -444,20 +466,122 @@ function addTodo(){
 }
 function toggleTodo(i){ todos[i].done = !todos[i].done; renderAll(); }
 
-function addHabit(){
-  const t = document.getElementById('habit-title').value.trim();
-  const f = document.getElementById('habit-freq').value.trim();
-  if(!t) return;
-  habits.push({title:t, freq:f||'每天', streak:0, doneToday:false});
-  document.getElementById('habit-title').value='';
-  document.getElementById('habit-freq').value='';
-  toggleForm('habit-form');
-  renderAll();
+// ---------- 月曆／週曆 ----------
+let calendarView = 'month';
+let calendarAnchor = new Date();       // 目前顯示的月份/週所在日期
+let selectedTodoDate = isoToday(0);    // 待辦清單目前篩選的日期，null 代表顯示全部
+
+function fmtDue(iso){
+  if(!iso) return '未設定';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'});
 }
-function toggleHabit(i){
-  habits[i].doneToday = !habits[i].doneToday;
-  habits[i].streak += habits[i].doneToday ? 1 : -1;
-  renderAll();
+function todosSortedByDate(){
+  return todos.map((t,i)=>({t,i})).sort((a,b)=>(a.t.due||'').localeCompare(b.t.due||''));
+}
+function dateToIso(d){ return d.toISOString().slice(0,10); }
+function startOfWeek(d){
+  const r = new Date(d);
+  r.setDate(r.getDate() - r.getDay());
+  return r;
+}
+
+function setCalendarView(view){
+  calendarView = view;
+  renderCalendar();
+}
+function calendarNav(dir){
+  if(calendarView === 'month'){
+    calendarAnchor.setMonth(calendarAnchor.getMonth() + dir);
+  } else {
+    calendarAnchor.setDate(calendarAnchor.getDate() + dir * 7);
+  }
+  renderCalendar();
+}
+function selectCalendarDate(iso){
+  selectedTodoDate = iso;
+  renderTodoList();
+  renderCalendar();
+}
+function clearTodoDateFilter(){
+  selectedTodoDate = null;
+  renderTodoList();
+  renderCalendar();
+}
+
+function renderCalendar(){
+  document.getElementById('cal-view-month').classList.toggle('active', calendarView==='month');
+  document.getElementById('cal-view-week').classList.toggle('active', calendarView==='week');
+
+  const weekdayLabels = ['日','一','二','三','四','五','六'];
+  document.getElementById('cal-weekdays').innerHTML = weekdayLabels.map(w=>`<span>${w}</span>`).join('');
+
+  const todosByDate = {};
+  todos.forEach(t=>{ if(t.due){ (todosByDate[t.due] ||= []).push(t); } });
+  const todayIso = isoToday(0);
+  const grid = document.getElementById('cal-grid');
+
+  function dayCell(d){
+    const iso = dateToIso(d);
+    const inCurrentMonth = calendarView==='week' || d.getMonth()===calendarAnchor.getMonth();
+    const cls = ['cal-day'];
+    if(!inCurrentMonth) cls.push('other-month');
+    if(iso===todayIso) cls.push('today');
+    if(iso===selectedTodoDate) cls.push('selected');
+    const hasDot = todosByDate[iso] && todosByDate[iso].length;
+    return `<div class="${cls.join(' ')}" onclick="selectCalendarDate('${iso}')">${d.getDate()}${hasDot?'<span class="dot"></span>':''}</div>`;
+  }
+
+  if(calendarView === 'month'){
+    document.getElementById('cal-nav-label').textContent =
+      calendarAnchor.toLocaleDateString('zh-TW', {year:'numeric', month:'long'});
+    const first = new Date(calendarAnchor.getFullYear(), calendarAnchor.getMonth(), 1);
+    const gridStart = startOfWeek(first);
+    let html = '';
+    const cursor = new Date(gridStart);
+    for(let i=0;i<42;i++){
+      html += dayCell(cursor);
+      cursor.setDate(cursor.getDate()+1);
+    }
+    grid.className = 'cal-grid';
+    grid.innerHTML = html;
+  } else {
+    const weekStart = startOfWeek(calendarAnchor);
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+6);
+    const label = `${weekStart.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})} - ${weekEnd.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})}`;
+    document.getElementById('cal-nav-label').textContent = label;
+    let html = '';
+    const cursor = new Date(weekStart);
+    for(let i=0;i<7;i++){
+      html += dayCell(cursor);
+      cursor.setDate(cursor.getDate()+1);
+    }
+    grid.className = 'cal-grid week-mode';
+    grid.innerHTML = html;
+  }
+}
+
+function renderTodoList(){
+  const label = document.getElementById('todo-list-label');
+  const clearBtn = document.getElementById('todo-list-clear');
+  const list = selectedTodoDate ? todos.map((t,i)=>({t,i})).filter(({t})=>t.due===selectedTodoDate) : todosSortedByDate();
+
+  if(selectedTodoDate){
+    const d = new Date(selectedTodoDate + 'T00:00:00');
+    label.textContent = d.toLocaleDateString('zh-TW',{month:'long', day:'numeric', weekday:'short'}) + ' 待辦';
+    clearBtn.style.display = 'inline';
+  } else {
+    label.textContent = '全部待辦';
+    clearBtn.style.display = 'none';
+  }
+
+  document.getElementById('todo-list').innerHTML = list.map(({t,i})=>`
+    <div class="list-item">
+      <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
+      <span class="item-title ${t.done?'done':''}">${t.title}</span>
+      <span class="item-meta">${fmtDue(t.due)}</span>
+    </div>`).join('') || (selectedTodoDate ? '<div class="empty">這天沒有待辦</div>' : '<div class="empty">目前沒有待辦</div>');
 }
 
 function addExpense(){
@@ -589,9 +713,20 @@ function importStepsFromText(text){
 function setupImportPanel({ btnId, panelId, textareaId, confirmId, cancelId, onImport }){
   const btn = document.getElementById(btnId), panel = document.getElementById(panelId), textarea = document.getElementById(textareaId);
   const confirmBtn = document.getElementById(confirmId), cancelBtn = document.getElementById(cancelId);
-  function open(){ panel.hidden = false; btn.hidden = true; textarea.value = ""; textarea.focus(); }
+  function openManual(){ panel.hidden = false; btn.hidden = true; textarea.value = ""; textarea.focus(); }
   function close(){ panel.hidden = true; btn.hidden = false; textarea.value = ""; }
-  btn.addEventListener("click", open);
+  async function autoImport(){
+    if (!navigator.clipboard || !navigator.clipboard.readText) { openManual(); return; }
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) { alert("剪貼簿目前是空的，請先複製內容。"); return; }
+      onImport(text);
+    } catch (err) {
+      // 使用者未授權剪貼簿權限，退回手動貼上模式
+      openManual();
+    }
+  }
+  btn.addEventListener("click", autoImport);
   cancelBtn.addEventListener("click", close);
   confirmBtn.addEventListener("click", () => { onImport(textarea.value); close(); });
 }
@@ -614,34 +749,22 @@ function renderAll(){
 
   document.getElementById('home-todo-count').textContent =
     todos.filter(t=>!t.done).length + ' 項未完成';
-  document.getElementById('home-todo-list').innerHTML = todos.slice(0,3).map((t,i)=>`
+  document.getElementById('home-todo-list').innerHTML = todosSortedByDate().slice(0,3).map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
       <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      <span class="item-meta">${t.due}</span>
+      <span class="item-meta">${fmtDue(t.due)}</span>
     </div>`).join('') || '<div class="empty">目前沒有待辦</div>';
-  document.getElementById('home-habit-list').innerHTML = habits.map((h,i)=>`
-    <div class="list-item">
-      <div class="check ${h.doneToday?'done':''}" onclick="toggleHabit(${i})">${fmtCheck(h.doneToday)}</div>
-      <span class="item-title">${h.title}</span>
-      <span class="item-meta">連續 ${h.streak} 天</span>
-    </div>`).join('') || '<div class="empty">尚未建立習慣</div>';
 
-  document.getElementById('todo-list').innerHTML = todos.map((t,i)=>`
+  const todayTodos = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===isoToday(0));
+  document.getElementById('home-schedule-list').innerHTML = todayTodos.map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
       <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      <span class="item-meta">${t.due}</span>
-    </div>`).join('') || '<div class="empty">目前沒有待辦</div>';
+    </div>`).join('') || '<div class="empty">今天沒有安排</div>';
 
-  document.getElementById('habit-list').innerHTML = habits.map((h,i)=>`
-    <div class="list-item">
-      <div class="check ${h.doneToday?'done':''}" onclick="toggleHabit(${i})">${fmtCheck(h.doneToday)}</div>
-      <span class="item-title">${h.title}</span>
-      <span class="item-meta">${h.freq} · 連續 ${h.streak} 天</span>
-    </div>`).join('') || '<div class="empty">尚未建立重複計畫</div>';
-
-  document.getElementById('health-exercise').textContent = habits.reduce((a,h)=>a+(h.streak>0?1:0),0);
+  renderCalendar();
+  renderTodoList();
 
   const total = expenses.reduce((a,e)=>a+e.amount,0);
   document.getElementById('budget-total').textContent = '$' + total.toLocaleString();
