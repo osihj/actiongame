@@ -176,7 +176,9 @@
   .cal-day.today{font-weight:800;color:var(--green);}
   .cal-day.selected{background:var(--green);color:var(--white);}
   .cal-day.selected.today{color:var(--white);}
-  .cal-day .dot{position:absolute;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--coral);}
+  .cal-day .dots{position:absolute;bottom:5px;display:flex;gap:3px;}
+  .cal-day .dot{width:4px;height:4px;border-radius:50%;background:var(--coral);}
+  .cal-day .dot.sched{background:var(--green);}
   .cal-day.selected .dot{background:var(--white);}
   .cal-grid.week-mode{grid-template-rows:auto;}
 
@@ -247,6 +249,17 @@
     </div>
     <div id="home-todo-list"></div>
   </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:10px;">
+      <span style="font-size:14px;font-weight:700;" id="home-sched-label">今日行程</span>
+      <span style="display:flex;align-items:center;gap:10px;">
+        <i class="ti ti-plus" style="cursor:pointer;color:var(--muted);" onclick="openScheduleFormFor(homeViewDate)"></i>
+        <span class="item-meta" id="home-sched-count"></span>
+      </span>
+    </div>
+    <div id="home-sched-list"></div>
+  </div>
 </section>
 
 <section class="page" data-page="todo">
@@ -291,9 +304,27 @@
 </section>
 
 <section class="page" data-page="work">
-  <p class="eyebrow">WORK</p>
-  <h2 class="title">工作</h2>
-  <div class="card"><div class="empty">尚未規劃工作專案，先從「待辦」記錄工作事項即可。</div></div>
+  <p class="eyebrow">SCHEDULE</p>
+  <h2 class="title">行程</h2>
+
+  <button class="add-btn" onclick="openScheduleFormFor(selectedTodoDate)">+ 新增行程</button>
+  <div class="inline-form card" id="sched-form">
+    <input id="sched-title" placeholder="標題，例如：和客戶開會">
+    <input id="sched-date" type="date">
+    <input id="sched-time" type="time" placeholder="開始時間">
+    <input id="sched-end" type="time" placeholder="結束時間（選填）">
+    <input id="sched-location" placeholder="地點（選填）">
+    <textarea id="sched-notes" placeholder="備註，例如交通方式、要帶的東西（選填）" rows="2"></textarea>
+    <button class="save-btn" id="sched-save-btn" onclick="saveSchedule()">儲存</button>
+    <span class="item-meta" id="sched-cancel-edit-btn" style="display:none;text-align:center;cursor:pointer;margin-top:8px;" onclick="cancelScheduleEdit()">取消編輯</span>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:10px;">
+      <span style="font-size:14px;font-weight:700;">行程清單</span>
+    </div>
+    <div id="sched-list"></div>
+  </div>
 </section>
 
 <section class="page" data-page="budget">
@@ -481,7 +512,7 @@
 const NAV = [
   {id:'home', label:'首頁', icon:'ti-home', color:'var(--blue)'},
   {id:'todo', label:'待辦', icon:'ti-calendar', color:'var(--coral)'},
-  {id:'work', label:'工作', icon:'ti-briefcase', color:'var(--purple)'},
+  {id:'work', label:'行程', icon:'ti-map-pin', color:'var(--purple)'},
   {id:'budget', label:'記帳', icon:'ti-wallet', color:'var(--green)'},
   {id:'knowledge', label:'知識庫', icon:'ti-books', color:'var(--blue)'},
   {id:'diary', label:'日記', icon:'ti-feather', color:'var(--pink)'},
@@ -497,6 +528,8 @@ function isoToday(offsetDays){
 }
 let todos = [];
 let editingTodoIndex = null;
+let schedules = [];
+let editingScheduleIndex = null;
 let expenses = [];
 let budgetCategories = ['飲食','服飾','居住','交通','教育','娛樂','其他'];
 let selectedBudgetCategory = budgetCategories[0];
@@ -647,6 +680,90 @@ function rolloverOverdueTodos(){
   todos.forEach(t=>{ if(!t.done && t.due && t.due < today){ t.due = today; } });
 }
 
+// ---------- 行程 ----------
+function openScheduleFormFor(dateIso){
+  switchPage('work');
+  cancelScheduleEdit();
+  document.getElementById('sched-date').value = dateIso || isoToday(0);
+  document.getElementById('sched-form').classList.add('open');
+  document.getElementById('sched-title').focus();
+}
+function saveSchedule(){
+  const t = document.getElementById('sched-title').value.trim();
+  const d = document.getElementById('sched-date').value;
+  const tm = document.getElementById('sched-time').value;
+  const end = document.getElementById('sched-end').value;
+  const loc = document.getElementById('sched-location').value.trim();
+  const notes = document.getElementById('sched-notes').value.trim();
+  if(!t) return;
+  if(editingScheduleIndex !== null){
+    const cur = schedules[editingScheduleIndex];
+    cur.title = t; cur.date = d||isoToday(0); cur.time = tm||''; cur.endTime = end||''; cur.location = loc; cur.notes = notes;
+  } else {
+    schedules.push({title:t, date:d||isoToday(0), time:tm||'', endTime:end||'', location:loc, notes:notes});
+  }
+  cancelScheduleEdit();
+  renderAll();
+}
+function editSchedule(i){
+  const s = schedules[i];
+  if(!s) return;
+  editingScheduleIndex = i;
+  document.getElementById('sched-title').value = s.title || '';
+  document.getElementById('sched-date').value = s.date || '';
+  document.getElementById('sched-time').value = s.time || '';
+  document.getElementById('sched-end').value = s.endTime || '';
+  document.getElementById('sched-location').value = s.location || '';
+  document.getElementById('sched-notes').value = s.notes || '';
+  document.getElementById('sched-save-btn').textContent = '更新';
+  document.getElementById('sched-cancel-edit-btn').style.display = 'block';
+  document.getElementById('sched-form').classList.add('open');
+  document.getElementById('sched-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function cancelScheduleEdit(){
+  editingScheduleIndex = null;
+  document.getElementById('sched-title').value = '';
+  document.getElementById('sched-date').value = '';
+  document.getElementById('sched-time').value = '';
+  document.getElementById('sched-end').value = '';
+  document.getElementById('sched-location').value = '';
+  document.getElementById('sched-notes').value = '';
+  document.getElementById('sched-save-btn').textContent = '儲存';
+  document.getElementById('sched-cancel-edit-btn').style.display = 'none';
+  document.getElementById('sched-form').classList.remove('open');
+}
+function deleteSchedule(i){
+  const s = schedules[i];
+  if(!s) return;
+  if(!confirm('確定要刪除「' + s.title + '」這項行程嗎？')) return;
+  if(editingScheduleIndex === i) cancelScheduleEdit();
+  schedules.splice(i,1);
+  renderAll();
+}
+function schedulesSortedByDate(){
+  return schedules.map((s,i)=>({s,i})).sort((a,b)=>
+    (a.s.date||'').localeCompare(b.s.date||'') || (a.s.time||'').localeCompare(b.s.time||''));
+}
+function fmtSchedTime(s){
+  if(!s.time) return '時間未定';
+  return s.endTime ? `${s.time} - ${s.endTime}` : s.time;
+}
+function renderScheduleList(){
+  const list = schedulesSortedByDate();
+  document.getElementById('sched-list').innerHTML = list.map(({s,i})=>`
+    <div class="list-item">
+      <div style="flex:1;">
+        <span class="item-title" style="display:block;">${escapeHtml(s.title)}</span>
+        <span class="item-meta">${fmtDue(s.date, '')} · ${fmtSchedTime(s)}${s.location ? ' · ' + escapeHtml(s.location) : ''}</span>
+        ${s.notes ? `<span class="item-meta" style="display:block;margin-top:2px;">${escapeHtml(s.notes)}</span>` : ''}
+      </div>
+      <div class="item-actions">
+        <i class="ti ti-pencil" onclick="editSchedule(${i})"></i>
+        <i class="ti ti-trash" onclick="deleteSchedule(${i})"></i>
+      </div>
+    </div>`).join('') || '<div class="empty">尚無行程</div>';
+}
+
 // ---------- 月曆／週曆 ----------
 let calendarView = 'month';
 let calendarAnchor = new Date();       // 目前顯示的月份/週所在日期
@@ -714,6 +831,8 @@ function renderCalendar(){
 
   const todosByDate = {};
   todos.forEach(t=>{ if(t.due){ (todosByDate[t.due] ||= []).push(t); } });
+  const schedByDate = {};
+  schedules.forEach(s=>{ if(s.date){ (schedByDate[s.date] ||= []).push(s); } });
   const todayIso = isoToday(0);
   const grid = document.getElementById('cal-grid');
 
@@ -724,8 +843,12 @@ function renderCalendar(){
     if(!inCurrentMonth) cls.push('other-month');
     if(iso===todayIso) cls.push('today');
     if(iso===selectedTodoDate) cls.push('selected');
-    const hasDot = todosByDate[iso] && todosByDate[iso].length;
-    return `<div class="${cls.join(' ')}" onclick="selectCalendarDate('${iso}')">${d.getDate()}${hasDot?'<span class="dot"></span>':''}</div>`;
+    const hasTodoDot = todosByDate[iso] && todosByDate[iso].length;
+    const hasSchedDot = schedByDate[iso] && schedByDate[iso].length;
+    const dots = (hasTodoDot||hasSchedDot)
+      ? `<span class="dots">${hasTodoDot?'<span class="dot"></span>':''}${hasSchedDot?'<span class="dot sched"></span>':''}</span>`
+      : '';
+    return `<div class="${cls.join(' ')}" onclick="selectCalendarDate('${iso}')">${d.getDate()}${dots}</div>`;
   }
 
   if(calendarView === 'month'){
@@ -1285,8 +1408,21 @@ function renderAll(){
       ${t.time ? `<span class="item-meta">${t.time}</span>` : ''}
     </div>`).join('') || '<div class="empty">這天沒有待辦</div>';
 
+  document.getElementById('home-sched-label').textContent = isViewingToday ? '今日行程' : `${homeDateShort} 行程`;
+  const daySchedules = schedules.map((s,i)=>({s,i})).filter(({s})=>s.date===homeViewDate)
+    .sort((a,b)=>(a.s.time||'').localeCompare(b.s.time||''));
+  document.getElementById('home-sched-count').textContent = daySchedules.length + ' 項';
+  document.getElementById('home-sched-list').innerHTML = daySchedules.map(({s,i})=>`
+    <div class="list-item">
+      <div style="flex:1;">
+        <span class="item-title" style="display:block;">${escapeHtml(s.title)}</span>
+        <span class="item-meta">${fmtSchedTime(s)}${s.location ? ' · ' + escapeHtml(s.location) : ''}</span>
+      </div>
+    </div>`).join('') || '<div class="empty">這天沒有行程</div>';
+
   renderCalendar();
   renderTodoList();
+  renderScheduleList();
 
   document.getElementById('budget-category-picker').innerHTML = budgetCategories.map(c=>`
     <span class="chip ${selectedBudgetCategory===c?'sel':''}" onclick="pickBudgetCategory('${c}')">${c}</span>`).join('');
