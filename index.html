@@ -20,6 +20,7 @@
     --muted:#6B6559;
     --white:#FFFFFF;
     --line:#E8E6DE;
+    --overdue:#B3452C;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
@@ -71,6 +72,13 @@
   .item-title{font-size:14px;flex:1;font-weight:600;}
   .item-title.done{text-decoration:line-through;color:var(--muted);}
   .item-meta{font-size:12px;color:var(--muted);}
+  .item-meta.overdue{color:var(--overdue);font-weight:700;}
+  .item-title.overdue{color:var(--overdue);}
+  .item-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;}
+  .item-actions i{font-size:17px;color:var(--muted);padding:6px;cursor:pointer;}
+  .quick-add-row{display:flex;gap:8px;align-items:center;padding:2px 16px;margin-bottom:12px;}
+  .quick-add-row input{margin-bottom:0;}
+  .quick-add-row i{font-size:20px;color:var(--muted);flex-shrink:0;}
 
   .tag{display:inline-block;font-size:12px;padding:6px 14px;border-radius:999px;border:0.5px solid var(--line);
     color:var(--blue);margin:0 6px 6px 0;cursor:pointer;font-weight:700;}
@@ -255,11 +263,18 @@
     <div class="cal-grid" id="cal-grid"></div>
   </div>
 
-  <button class="add-btn" onclick="toggleForm('todo-form')">+ 新增待辦</button>
+  <div class="quick-add-row card">
+    <i class="ti ti-bolt"></i>
+    <input id="todo-quick-input" placeholder="快速新增，輸入後按 Enter（預設今天）" onkeydown="if(event.key==='Enter') quickAddTodo()">
+  </div>
+
+  <button class="add-btn" onclick="toggleForm('todo-form')">+ 新增待辦（含日期時間）</button>
   <div class="inline-form card" id="todo-form">
     <input id="todo-title" placeholder="標題，例如：交週報">
     <input id="todo-due" type="date">
-    <button class="save-btn" onclick="addTodo()">儲存</button>
+    <input id="todo-time" type="time">
+    <button class="save-btn" id="todo-save-btn" onclick="saveTodo()">儲存</button>
+    <span class="item-meta" id="todo-cancel-edit-btn" style="display:none;text-align:center;cursor:pointer;margin-top:8px;" onclick="cancelTodoEdit()">取消編輯</span>
   </div>
 
   <div class="card">
@@ -473,10 +488,11 @@ function isoToday(offsetDays){
   return d.toISOString().slice(0,10);
 }
 let todos = [
-  {title:'交專案週報', due:isoToday(2), done:false},
-  {title:'回覆客戶信件', due:isoToday(1), done:true},
-  {title:'整理會議紀錄', due:isoToday(0), done:false},
+  {title:'交專案週報', due:isoToday(2), time:'', done:false},
+  {title:'回覆客戶信件', due:isoToday(1), time:'', done:true},
+  {title:'整理會議紀錄', due:isoToday(0), time:'14:00', done:false},
 ];
+let editingTodoIndex = null;
 let expenses = [
   {title:'午餐', amount:120},
   {title:'咖啡', amount:80},
@@ -561,28 +577,71 @@ function quickAction(type){
   }
 }
 
-function addTodo(){
+function saveTodo(){
   const t = document.getElementById('todo-title').value.trim();
   const d = document.getElementById('todo-due').value;
+  const tm = document.getElementById('todo-time').value;
   if(!t) return;
-  todos.push({title:t, due:d||isoToday(0), done:false});
-  document.getElementById('todo-title').value='';
-  document.getElementById('todo-due').value='';
-  toggleForm('todo-form');
+  if(editingTodoIndex !== null){
+    const cur = todos[editingTodoIndex];
+    cur.title = t; cur.due = d||isoToday(0); cur.time = tm||'';
+  } else {
+    todos.push({title:t, due:d||isoToday(0), time:tm||'', done:false});
+  }
+  cancelTodoEdit();
+  renderAll();
+}
+function editTodo(i){
+  const t = todos[i];
+  if(!t) return;
+  editingTodoIndex = i;
+  document.getElementById('todo-title').value = t.title || '';
+  document.getElementById('todo-due').value = t.due || '';
+  document.getElementById('todo-time').value = t.time || '';
+  document.getElementById('todo-save-btn').textContent = '更新';
+  document.getElementById('todo-cancel-edit-btn').style.display = 'block';
+  document.getElementById('todo-form').classList.add('open');
+  document.getElementById('todo-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function cancelTodoEdit(){
+  editingTodoIndex = null;
+  document.getElementById('todo-title').value = '';
+  document.getElementById('todo-due').value = '';
+  document.getElementById('todo-time').value = '';
+  document.getElementById('todo-save-btn').textContent = '儲存';
+  document.getElementById('todo-cancel-edit-btn').style.display = 'none';
+  document.getElementById('todo-form').classList.remove('open');
+}
+function deleteTodo(i){
+  const t = todos[i];
+  if(!t) return;
+  if(!confirm('確定要刪除「' + t.title + '」這項待辦嗎？')) return;
+  if(editingTodoIndex === i) cancelTodoEdit();
+  todos.splice(i,1);
+  renderAll();
+}
+function quickAddTodo(){
+  const el = document.getElementById('todo-quick-input');
+  const t = el.value.trim();
+  if(!t) return;
+  todos.push({title:t, due:isoToday(0), time:'', done:false});
+  el.value = '';
   renderAll();
 }
 function toggleTodo(i){ todos[i].done = !todos[i].done; renderAll(); }
+function isOverdueTodo(t){ return !t.done && t.due && t.due < isoToday(0); }
 
 // ---------- 月曆／週曆 ----------
 let calendarView = 'month';
 let calendarAnchor = new Date();       // 目前顯示的月份/週所在日期
 let selectedTodoDate = isoToday(0);    // 待辦清單目前篩選的日期，null 代表顯示全部
 
-function fmtDue(iso){
+function fmtDue(iso, time){
   if(!iso) return '未設定';
   const d = new Date(iso + 'T00:00:00');
   if (isNaN(d)) return iso;
-  return d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'});
+  const dateStr = d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'});
+  return time ? `${dateStr} ${time}` : dateStr;
 }
 function todosSortedByDate(){
   return todos.map((t,i)=>({t,i})).sort((a,b)=>(a.t.due||'').localeCompare(b.t.due||''));
@@ -686,8 +745,12 @@ function renderTodoList(){
   document.getElementById('todo-list').innerHTML = list.map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
-      <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      <span class="item-meta">${fmtDue(t.due)}</span>
+      <span class="item-title ${t.done?'done':''} ${isOverdueTodo(t)?'overdue':''}">${t.title}</span>
+      <span class="item-meta ${isOverdueTodo(t)?'overdue':''}">${isOverdueTodo(t)?'逾期 · ':''}${fmtDue(t.due, t.time)}</span>
+      <div class="item-actions">
+        <i class="ti ti-pencil" onclick="editTodo(${i})"></i>
+        <i class="ti ti-trash" onclick="deleteTodo(${i})"></i>
+      </div>
     </div>`).join('') || (selectedTodoDate ? '<div class="empty">這天沒有待辦</div>' : '<div class="empty">目前沒有待辦</div>');
 }
 
@@ -1140,8 +1203,8 @@ function renderAll(){
   document.getElementById('home-todo-list').innerHTML = todosSortedByDate().slice(0,3).map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
-      <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      <span class="item-meta">${fmtDue(t.due)}</span>
+      <span class="item-title ${t.done?'done':''} ${isOverdueTodo(t)?'overdue':''}">${t.title}</span>
+      <span class="item-meta ${isOverdueTodo(t)?'overdue':''}">${isOverdueTodo(t)?'逾期 · ':''}${fmtDue(t.due, t.time)}</span>
     </div>`).join('') || '<div class="empty">目前沒有待辦</div>';
 
   const todayTodos = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===isoToday(0));
@@ -1149,6 +1212,7 @@ function renderAll(){
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
       <span class="item-title ${t.done?'done':''}">${t.title}</span>
+      ${t.time ? `<span class="item-meta">${t.time}</span>` : ''}
     </div>`).join('') || '<div class="empty">今天沒有安排</div>';
 
   renderCalendar();
