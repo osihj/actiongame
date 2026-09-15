@@ -241,24 +241,17 @@
     <div class="row" style="margin-bottom:10px;">
       <span style="font-size:14px;font-weight:700;" id="home-todo-label">今日待辦</span>
       <span style="display:flex;align-items:center;gap:10px;">
-        <i class="ti ti-plus" style="cursor:pointer;color:var(--muted);" onclick="quickAction('todo')"></i>
+        <i class="ti ti-plus" style="cursor:pointer;color:var(--muted);" onclick="openTodoFormFor(homeViewDate)"></i>
         <span class="item-meta" id="home-todo-count"></span>
       </span>
     </div>
     <div id="home-todo-list"></div>
   </div>
-  <div class="card">
-    <div class="row" style="margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:700;" id="home-schedule-label">今日行程</span>
-      <i class="ti ti-plus" style="cursor:pointer;color:var(--muted);" onclick="quickAction('todo')"></i>
-    </div>
-    <div id="home-schedule-list"></div>
-  </div>
 </section>
 
 <section class="page" data-page="todo">
-  <p class="eyebrow">SCHEDULE</p>
-  <h2 class="title">日程與待辦</h2>
+  <p class="eyebrow">TODO</p>
+  <h2 class="title">待辦</h2>
 
   <div class="card" style="padding:14px;">
     <div class="cal-toggle">
@@ -279,7 +272,7 @@
     <input id="todo-quick-input" placeholder="快速新增，輸入後按 Enter（預設今天）" onkeydown="if(event.key==='Enter') quickAddTodo()">
   </div>
 
-  <button class="add-btn" onclick="toggleForm('todo-form')">+ 新增待辦（含日期時間）</button>
+  <button class="add-btn" onclick="openTodoFormFor(selectedTodoDate)">+ 新增待辦（含日期時間）</button>
   <div class="inline-form card" id="todo-form">
     <input id="todo-title" placeholder="標題，例如：交週報">
     <input id="todo-due" type="date">
@@ -300,7 +293,7 @@
 <section class="page" data-page="work">
   <p class="eyebrow">WORK</p>
   <h2 class="title">工作</h2>
-  <div class="card"><div class="empty">尚未規劃工作專案，先從「日程與待辦」記錄工作事項即可。</div></div>
+  <div class="card"><div class="empty">尚未規劃工作專案，先從「待辦」記錄工作事項即可。</div></div>
 </section>
 
 <section class="page" data-page="budget">
@@ -483,7 +476,7 @@
 <script>
 const NAV = [
   {id:'home', label:'首頁', icon:'ti-home', color:'var(--blue)'},
-  {id:'todo', label:'日程與待辦', icon:'ti-calendar', color:'var(--coral)'},
+  {id:'todo', label:'待辦', icon:'ti-calendar', color:'var(--coral)'},
   {id:'work', label:'工作', icon:'ti-briefcase', color:'var(--purple)'},
   {id:'budget', label:'記帳', icon:'ti-wallet', color:'var(--green)'},
   {id:'knowledge', label:'知識庫', icon:'ti-books', color:'var(--blue)'},
@@ -496,7 +489,7 @@ const NAV = [
 function isoToday(offsetDays){
   const d = new Date();
   d.setDate(d.getDate() + (offsetDays||0));
-  return d.toISOString().slice(0,10);
+  return dateToIso(d);
 }
 let todos = [];
 let editingTodoIndex = null;
@@ -584,6 +577,13 @@ function quickAction(type){
   }
 }
 
+function openTodoFormFor(dateIso){
+  switchPage('todo');
+  cancelTodoEdit();
+  document.getElementById('todo-due').value = dateIso || isoToday(0);
+  document.getElementById('todo-form').classList.add('open');
+  document.getElementById('todo-title').focus();
+}
 function saveTodo(){
   const t = document.getElementById('todo-title').value.trim();
   const d = document.getElementById('todo-due').value;
@@ -665,7 +665,12 @@ function fmtDue(iso, time){
 function todosSortedByDate(){
   return todos.map((t,i)=>({t,i})).sort((a,b)=>(a.t.due||'').localeCompare(b.t.due||''));
 }
-function dateToIso(d){ return d.toISOString().slice(0,10); }
+function dateToIso(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function startOfWeek(d){
   const r = new Date(d);
   r.setDate(r.getDate() - r.getDay());
@@ -1224,25 +1229,17 @@ function renderAll(){
   const homeDateShort = homeDateObj.toLocaleDateString('zh-TW',{month:'long', day:'numeric', weekday:'short'});
   document.getElementById('home-date-nav-label').textContent = isViewingToday ? `今天 · ${homeDateShort}` : homeDateShort;
   document.getElementById('home-todo-label').textContent = isViewingToday ? '今日待辦' : `${homeDateShort} 待辦`;
-  document.getElementById('home-schedule-label').textContent = isViewingToday ? '今日行程' : `${homeDateShort} 行程`;
 
   document.getElementById('home-todo-count').textContent =
     todos.filter(t=>!t.done).length + ' 項未完成';
-  const todayTasks = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===homeViewDate && !t.time);
-  document.getElementById('home-todo-list').innerHTML = todayTasks.slice(0,3).map(({t,i})=>`
+  const dayTodos = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===homeViewDate)
+    .sort((a,b)=>(a.t.time||'').localeCompare(b.t.time||''));
+  document.getElementById('home-todo-list').innerHTML = dayTodos.map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
       <span class="item-title ${t.done?'done':''}">${t.title}</span>
+      ${t.time ? `<span class="item-meta">${t.time}</span>` : ''}
     </div>`).join('') || '<div class="empty">這天沒有待辦</div>';
-
-  const todaySchedule = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===homeViewDate && t.time)
-    .sort((a,b)=>a.t.time.localeCompare(b.t.time));
-  document.getElementById('home-schedule-list').innerHTML = todaySchedule.map(({t,i})=>`
-    <div class="list-item">
-      <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
-      <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      <span class="item-meta">${t.time}</span>
-    </div>`).join('') || '<div class="empty">這天沒有安排</div>';
 
   renderCalendar();
   renderTodoList();
