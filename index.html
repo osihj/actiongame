@@ -303,13 +303,17 @@
   <div class="inline-form card" id="budget-form">
     <input id="budget-title" placeholder="項目，例如：午餐">
     <input id="budget-amount" placeholder="金額，例如：120" type="number">
-    <button class="save-btn" onclick="addExpense()">儲存</button>
+    <input id="budget-date" type="date">
+    <div class="chip-picker" id="budget-category-picker"></div>
+    <button class="save-btn" id="budget-save-btn" onclick="saveExpense()">儲存</button>
+    <span class="item-meta" id="budget-cancel-edit-btn" style="display:none;text-align:center;cursor:pointer;margin-top:8px;" onclick="cancelExpenseEdit()">取消編輯</span>
   </div>
   <div class="card">
     <div class="row" style="margin-bottom:10px;">
       <span style="font-size:14px;font-weight:700;">本月支出</span>
       <span style="font-size:18px;font-weight:800;color:var(--blue);" id="budget-total">$0</span>
     </div>
+    <div class="chip-picker" id="budget-filter-picker"></div>
     <div id="budget-list"></div>
   </div>
 </section>
@@ -493,10 +497,11 @@ function isoToday(offsetDays){
 }
 let todos = [];
 let editingTodoIndex = null;
-let expenses = [
-  {title:'午餐', amount:120},
-  {title:'咖啡', amount:80},
-];
+let expenses = [];
+let budgetCategories = ['飲食','服飾','居住','交通','教育','娛樂','其他'];
+let selectedBudgetCategory = budgetCategories[0];
+let selectedBudgetFilter = null;
+let editingExpenseIndex = null;
 let notes = [
   {title:'會議記錄範本', cat:'工作筆記'},
 ];
@@ -778,14 +783,53 @@ function renderTodoList(){
     </div>`).join('') || (selectedTodoDate ? '<div class="empty">這天沒有待辦</div>' : '<div class="empty">目前沒有待辦</div>');
 }
 
-function addExpense(){
+function pickBudgetCategory(c){ selectedBudgetCategory = c; renderAll(); }
+function filterBudgetCategory(c){ selectedBudgetFilter = c || null; renderAll(); }
+
+function saveExpense(){
   const t = document.getElementById('budget-title').value.trim();
   const a = parseFloat(document.getElementById('budget-amount').value);
+  const d = document.getElementById('budget-date').value;
   if(!t || !a) return;
-  expenses.push({title:t, amount:a});
-  document.getElementById('budget-title').value='';
-  document.getElementById('budget-amount').value='';
-  toggleForm('budget-form');
+  if(editingExpenseIndex !== null){
+    const cur = expenses[editingExpenseIndex];
+    cur.title = t; cur.amount = a; cur.date = d||isoToday(0); cur.category = selectedBudgetCategory;
+  } else {
+    expenses.push({title:t, amount:a, date:d||isoToday(0), category:selectedBudgetCategory});
+  }
+  cancelExpenseEdit();
+  renderAll();
+}
+function editExpense(i){
+  const e = expenses[i];
+  if(!e) return;
+  editingExpenseIndex = i;
+  document.getElementById('budget-title').value = e.title || '';
+  document.getElementById('budget-amount').value = e.amount || '';
+  document.getElementById('budget-date').value = e.date || '';
+  selectedBudgetCategory = e.category || budgetCategories[0];
+  document.getElementById('budget-save-btn').textContent = '更新';
+  document.getElementById('budget-cancel-edit-btn').style.display = 'block';
+  document.getElementById('budget-form').classList.add('open');
+  document.getElementById('budget-form').scrollIntoView({behavior:'smooth', block:'start'});
+  renderAll();
+}
+function cancelExpenseEdit(){
+  editingExpenseIndex = null;
+  document.getElementById('budget-title').value = '';
+  document.getElementById('budget-amount').value = '';
+  document.getElementById('budget-date').value = '';
+  selectedBudgetCategory = budgetCategories[0];
+  document.getElementById('budget-save-btn').textContent = '儲存';
+  document.getElementById('budget-cancel-edit-btn').style.display = 'none';
+  document.getElementById('budget-form').classList.remove('open');
+}
+function deleteExpense(i){
+  const e = expenses[i];
+  if(!e) return;
+  if(!confirm('確定要刪除「' + e.title + '」這筆支出嗎？')) return;
+  if(editingExpenseIndex === i) cancelExpenseEdit();
+  expenses.splice(i,1);
   renderAll();
 }
 
@@ -1244,12 +1288,27 @@ function renderAll(){
   renderCalendar();
   renderTodoList();
 
-  const total = expenses.reduce((a,e)=>a+e.amount,0);
-  document.getElementById('budget-total').textContent = '$' + total.toLocaleString();
-  document.getElementById('budget-list').innerHTML = expenses.map(e=>`
+  document.getElementById('budget-category-picker').innerHTML = budgetCategories.map(c=>`
+    <span class="chip ${selectedBudgetCategory===c?'sel':''}" onclick="pickBudgetCategory('${c}')">${c}</span>`).join('');
+  document.getElementById('budget-filter-picker').innerHTML = ['全部', ...budgetCategories].map(c=>`
+    <span class="chip ${(c==='全部' ? !selectedBudgetFilter : selectedBudgetFilter===c)?'sel':''}" onclick="filterBudgetCategory('${c==='全部'?'':c}')">${c}</span>`).join('');
+
+  const curMonth = isoToday(0).slice(0,7);
+  const monthTotal = expenses.filter(e=>(e.date||'').slice(0,7)===curMonth).reduce((a,e)=>a+e.amount,0);
+  document.getElementById('budget-total').textContent = '$' + monthTotal.toLocaleString();
+  const shownExpenses = expenses.map((e,i)=>({e,i})).filter(({e})=>!selectedBudgetFilter || e.category===selectedBudgetFilter)
+    .sort((a,b)=>(b.e.date||'').localeCompare(a.e.date||''));
+  document.getElementById('budget-list').innerHTML = shownExpenses.map(({e,i})=>`
     <div class="list-item">
-      <span class="item-title">${e.title}</span>
-      <span class="item-meta">$${e.amount.toLocaleString()}</span>
+      <div style="flex:1;">
+        <span class="item-title" style="display:block;">${e.title}</span>
+        <span class="item-meta">${e.category || '其他'}${e.date ? ' · ' + fmtDue(e.date) : ''}</span>
+      </div>
+      <span class="item-meta" style="font-weight:700;">$${e.amount.toLocaleString()}</span>
+      <div class="item-actions">
+        <i class="ti ti-pencil" onclick="editExpense(${i})"></i>
+        <i class="ti ti-trash" onclick="deleteExpense(${i})"></i>
+      </div>
     </div>`).join('') || '<div class="empty">尚無支出紀錄</div>';
 
   const cats = [...new Set(notes.map(n=>n.cat))];
