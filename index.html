@@ -630,6 +630,10 @@ function quickAddTodo(){
 }
 function toggleTodo(i){ todos[i].done = !todos[i].done; renderAll(); }
 function isOverdueTodo(t){ return !t.done && t.due && t.due < isoToday(0); }
+function rolloverOverdueTodos(){
+  const today = isoToday(0);
+  todos.forEach(t=>{ if(!t.done && t.due && t.due < today){ t.due = today; } });
+}
 
 // ---------- 月曆／週曆 ----------
 let calendarView = 'month';
@@ -1198,21 +1202,24 @@ function renderAll(){
   document.getElementById('today-date').textContent =
     new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
 
+  rolloverOverdueTodos();
+
   document.getElementById('home-todo-count').textContent =
     todos.filter(t=>!t.done).length + ' 項未完成';
-  document.getElementById('home-todo-list').innerHTML = todosSortedByDate().slice(0,3).map(({t,i})=>`
-    <div class="list-item">
-      <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
-      <span class="item-title ${t.done?'done':''} ${isOverdueTodo(t)?'overdue':''}">${t.title}</span>
-      <span class="item-meta ${isOverdueTodo(t)?'overdue':''}">${isOverdueTodo(t)?'逾期 · ':''}${fmtDue(t.due, t.time)}</span>
-    </div>`).join('') || '<div class="empty">目前沒有待辦</div>';
-
-  const todayTodos = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===isoToday(0));
-  document.getElementById('home-schedule-list').innerHTML = todayTodos.map(({t,i})=>`
+  const todayTasks = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===isoToday(0) && !t.time);
+  document.getElementById('home-todo-list').innerHTML = todayTasks.slice(0,3).map(({t,i})=>`
     <div class="list-item">
       <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
       <span class="item-title ${t.done?'done':''}">${t.title}</span>
-      ${t.time ? `<span class="item-meta">${t.time}</span>` : ''}
+    </div>`).join('') || '<div class="empty">今天沒有待辦</div>';
+
+  const todaySchedule = todos.map((t,i)=>({t,i})).filter(({t})=>t.due===isoToday(0) && t.time)
+    .sort((a,b)=>a.t.time.localeCompare(b.t.time));
+  document.getElementById('home-schedule-list').innerHTML = todaySchedule.map(({t,i})=>`
+    <div class="list-item">
+      <div class="check ${t.done?'done':''}" onclick="toggleTodo(${i})">${fmtCheck(t.done)}</div>
+      <span class="item-title ${t.done?'done':''}">${t.title}</span>
+      <span class="item-meta">${t.time}</span>
     </div>`).join('') || '<div class="empty">今天沒有安排</div>';
 
   renderCalendar();
